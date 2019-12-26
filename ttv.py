@@ -1,9 +1,9 @@
 from tensorflow.python.keras.models import Sequential, Model
 from tensorflow.python.keras import layers, callbacks, regularizers, optimizers
 from tensorflow.python.keras import backend as K
-from bcg_net_architecture.arch0001 import *
 from collections import namedtuple
 import settings
+import bcg_net_architecture
 
 
 def opt_default():
