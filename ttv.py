@@ -28,7 +28,12 @@ def opt_default():
 
 
 def train(d_features, opt):
-    # See bcg_net.py for inspiration.  The extra thing to consider is that it would be nice to be able to switch between CNN and RNN which require fundamentally different data restructuring {- maybe - this could go in the architecture but probably there is some reason I have not thought about it, for why this doesn’t work }. I have example code for this, but may not be in bcg_net.
+    # See bcg_net.py for inspiration.  The extra thing to consider is that
+    # it would be nice to be able to switch between CNN and RNN which require
+    # fundamentally different data restructuring {- maybe - this could go in
+    # the architecture but probably there is some reason I have not thought
+    # about it, for why this doesn’t work }. I have example code for this,
+    # but may not be in bcg_net.
 
     # for each package of X, y, opt in d_features, let’s train and test!
         # load train, test and validation features, also opt_feature_extract
@@ -45,11 +50,14 @@ def train(d_features, opt):
 
     return
 
+
 def predict():
     return
 
+
 def clean():
     return
+
 
 if __name__ == '__main__':
     """ used for debugging """

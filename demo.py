@@ -9,8 +9,6 @@ from pathlib import Path
 
 settings.init(Path.home(), Path.home())  # Call only once
 
-print(settings.d_root)
-
 opt_data_loader = data_loader.opt_default()
 opt_data_loader.something = 'something_else'
 d_mne = data_loader.convert_to_mne(settings.d_root, opt_data_loader)

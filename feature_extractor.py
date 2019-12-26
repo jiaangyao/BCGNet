@@ -8,37 +8,49 @@ import settings
 
 def opt_default():
     # this is a function in feature_extractor.py with default settings
-    # not sure if there is a type in the channel settings in MNE, but if so that would be the easiest…:
+    # not sure if there is a type in the channel settings in MNE, but if
+    # so that would be the easiest…:
     Opt = namedtuple('Opt', ['input_feature_type', 'output_feature_type',
                              'input_feature', 'output_features',
                              'd_features', 't_epoch', 'generate', 'fs_ds'])
 
     return Opt(
         input_feature_type = ['ecg'],
-        output_feature_type = ['eeg'], # if the feature_type opt are None, then you can specify manually, e.g. opt.input_feature = [0, 1, 2] or, opt.input_feature = [‘Fz’, ‘Cz’] etc.
+        output_feature_type = ['eeg'], # if the feature_type opt are None,
+        # then you can specify manually, e.g. opt.input_feature = [0, 1, 2]
+        # or, opt.input_feature = [‘Fz’, ‘Cz’] etc.
         input_feature = None,
         output_features = None,
         d_features =  settings.d_root / 'proc_bcgnet/features/',
         t_epoch = 2,
-        generate = generate_ws_features,  # train and test within subject. To test across subject, or test within run we define new functions here
-                   # some extensions might fit neatly within generate_ws_features, for some we might need entirely new functions specified here.
-        fs_ds = 100 # frequency at which to downsample (this gets inverted at the end of the pipeline)
+        generate = generate_ws_features,  # train and test within subject.
+        # To test across subject, or test within run we define new functions
+        # here some extensions might fit neatly within generate_ws_features,
+        # for some we might need entirely new functions specified here.
+        fs_ds = 100 # frequency at which to downsample (this gets inverted
+        # at the end of the pipeline)
     )
 
 
 def generate(d_mne, opt):
-    # point here is to convert a standardised MNE structure to an epoched X, Y for training, test and validate
+    # point here is to convert a standardised MNE structure to an epoched X, Y
+    # for training, test and validate
 
-    # Assert that of  [opt.output_features, opt.output_feature_type], exactly one is none, do same for input
+    # Assert that of  [opt.output_features, opt.output_feature_type], exactly
+    # one is none, do same for input
     d_features  =  opt.generate(d_mne, opt)  # so that we can easily switch it out
     return d_features
 
 
 def generate_ws_features(d_mne, opt):
-   # n.b. This is the code that generates features to train and test within subject… different functions would need to be defined for different required feature sets. I suggest we start with this one, then see how we go….
+   # n.b. This is the code that generates features to train and test within
+   # subject… different functions would need to be defined for different
+   # required feature sets. I suggest we start with this one, then see how
+   # we go….
     d_mne = Path(opt.d_mne)
     d_features = Path(opt.d_features)
-#     d_features = d_features / something_unique_based_on_opt  # (I suggest a hash of opt, combined with some useful human readable stuff)
+    d_features = d_features / 'something_unique_based_on_opt'  # (I suggest
+   # a hash of opt, combined with some useful human readable stuff)
 #
 #     dict_files= …  # a structure that contains organised files. E.g.:
 #     # dict_files[‘subject01][0] = [0, 1, 2]  # i.e. [subject][session][run]
@@ -77,7 +89,8 @@ def generate_ws_features(d_mne, opt):
 
 @contextlib.contextmanager
 def temp_seed(seed):
-    # see bcg_net.py for the use of this (it’s to recreate epoching with same seed)
+    # see bcg_net.py for the use of this (it’s to recreate epoching with
+    # same seed)
     state = np.random.get_state()
     np.random.seed(seed)
 
@@ -89,7 +102,8 @@ def temp_seed(seed):
 
 def data_resample(data, fs_ds):
      # see bcg_net.py
-     # although I am not sure if we want this here! Maybe it should be in feature_extraction
+     # although I am not sure if we want this here! Maybe it should be in
+     # feature_extraction
      return data
 
 
