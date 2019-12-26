@@ -3,6 +3,7 @@ from pathlib import Path
 from collections import namedtuple
 import contextlib
 import numpy as np
+import settings
 
 
 def opt_default():
@@ -17,7 +18,7 @@ def opt_default():
         output_feature_type = ['eeg'], # if the feature_type opt are None, then you can specify manually, e.g. opt.input_feature = [0, 1, 2] or, opt.input_feature = [‘Fz’, ‘Cz’] etc.
         input_feature = None,
         output_features = None,
-        d_features =  '$d_root$/proc_bcgnet/features/',
+        d_features =  settings.d_root / 'proc_bcgnet/features/',
         t_epoch = 2,
         generate = generate_ws_features,  # train and test within subject. To test across subject, or test within run we define new functions here
                    # some extensions might fit neatly within generate_ws_features, for some we might need entirely new functions specified here.
@@ -31,6 +32,7 @@ def generate(d_mne, opt):
     # Assert that of  [opt.output_features, opt.output_feature_type], exactly one is none, do same for input
     d_features  =  opt.generate(d_mne, opt)  # so that we can easily switch it out
     return d_features
+
 
 def generate_ws_features(d_mne, opt):
    # n.b. This is the code that generates features to train and test within subject… different functions would need to be defined for different required feature sets. I suggest we start with this one, then see how we go….

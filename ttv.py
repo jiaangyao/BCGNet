@@ -3,6 +3,7 @@ from tensorflow.python.keras import layers, callbacks, regularizers, optimizers
 from tensorflow.python.keras import backend as K
 from bcg_net_architecture.arch0001 import *
 from collections import namedtuple
+import settings
 
 
 def opt_default():
@@ -51,10 +52,6 @@ def clean():
     return
 
 if __name__ == '__main__':
-    default = TrainDefault()
-    print(default)
-    print('test')
-    print('test2')
     """ used for debugging """
 
 

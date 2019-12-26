@@ -4,13 +4,16 @@ import bcg_net
 import data_loader
 import feature_extractor
 import ttv
+import settings
+from pathlib import Path
 
+settings.init(Path.home(), Path.home())  # Call only once
 
-d_root = "set some directory"
+print(settings.d_root)
 
-opt_data_loader = bcg_net.opt_default()
+opt_data_loader = data_loader.opt_default()
 opt_data_loader.something = 'something_else'
-d_mne = data_loader.convert_to_mne(d_root, opt_data_loader)
+d_mne = data_loader.convert_to_mne(settings.d_root, opt_data_loader)
 
 opt_feature_extractor = feature_extractor.opt_default()
 opt_feature_extractor.something = 'something_else'

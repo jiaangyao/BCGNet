@@ -7,6 +7,7 @@ import mne
 from pathlib import Path
 from collections import namedtuple
 import scipy.io
+import settings
 
 
 def opt_default():
@@ -15,7 +16,7 @@ def opt_default():
 
     return Opt(
         load_type = load_eeglab, # function handle to the function that we want to use to load the actual data. To make it easily extensible.
-        d_mne = '$d_root$ / proc_bcgnet/mne/', # if I was writing this myself, I would use environment variables to specify d_root, maybe there are opinions on this...
+        d_mne = settings.d_root / 'proc_bcgnet/mne/', # if I was writing this myself, I would use environment variables to specify d_root, maybe there are opinions on this...
         run_regex = '?', # capture subject name, session and run
         overwrite = False
     )
