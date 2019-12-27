@@ -42,7 +42,10 @@ def train(d_features, opt):
          # arch = opt.arch.create_arch(n_output, opt_feature_extract)
          # arch_name = opt.arch.get_name()
          #
-         # f_arch = ?  # again some name and hash that depends on the opt. It should probably be in a folder that has the same name as the d_features folder (i.e. what I called something_unique_based_on_opt in generate_ws_features) but with a file that is unique based on the arch.
+         # f_arch = ?  # again some name and hash that depends on the opt.
+    # It should probably be in a folder that has the same name as the d_features
+    # folder (i.e. what I called something_unique_based_on_opt in
+    # generate_ws_features) but with a file that is unique based on the arch.
 
         # if f_arch exists, we load it, if it is finished training that’s it
         # if it hasn’t finished training, we finish training
