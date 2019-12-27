@@ -101,15 +101,16 @@ def temp_seed(seed):
 
 
 def data_resample(data, fs_ds):
-     # see bcg_net.py
-     # although I am not sure if we want this here! Maybe it should be in
-     # feature_extraction
-     return data
+    # see bcg_net.py
+    # although I am not sure if we want this here! Maybe it should be in
+    # feature_extraction
+    data.resample(fs_ds)
+    return data
 
 
 def data_epoch(data, t):
     # mne based epoching
-     return data
+    return data
 
 
 if __name__ == '__main__':
