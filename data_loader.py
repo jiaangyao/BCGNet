@@ -12,6 +12,7 @@ from pathlib import Path
 from collections import namedtuple
 import scipy.io
 import settings
+import re
 
 
 def opt_default():
@@ -32,14 +33,18 @@ def opt_default():
 def convert_to_mne(d_ga_removed, opt):
     # put everything into a standard mne format.
     d_save = Path(opt.d_mne)
-    # d_ga_removed = % some regex operation using
-    #
-    # for f_input in d_ga_removed:
-    #     f_output = some regex operations on f_input using opt.run_regex (might need its own function)
-    #     f_output = d_save / f_output
-    #     # check if  f_output exists… if it does not (or opt.overwrite is false) then do following:
-    #     data = load_type(f_input) # load_eeglab??
-    #     data = data_save(data, f_output, opt)
+    d_ga_removed = d_save  # some regex operation using
+
+    for f_input in d_ga_removed:
+        f_output = f_input # some regex operations on f_input using
+        # opt.run_regex (might need its own function)
+        f_output = d_save / f_output
+        # check if  f_output exists… if it does not (or opt.overwrite is false)
+        # then do following:
+        if not f_output.is_file() or opt.overwrite:
+            data = load_eeglab(f_input)
+            data_save(data, f_output)
+
     return
 
 
@@ -53,12 +58,11 @@ def load_eeglab(f_input):  # see opt.load_type
     # See bcg_net.py I guess…
     data = mne.io.read_raw_eeglab(str(f_input), preload=True, stim_channel=False)
     # make sure that channel names are OK and channel types (e.g. they have ‘eeg’ or ‘ecg’ type)
-
     return data
 
   
 if __name__ == '__main__':
-    """ used for debugging? """
+    """ used for debugging """
     
 
 

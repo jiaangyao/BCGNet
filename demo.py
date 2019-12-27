@@ -7,6 +7,7 @@ import ttv
 import settings
 from pathlib import Path
 
+
 settings.init(Path.home(), Path.home())  # Call only once
 
 opt_data_loader = data_loader.opt_default()
