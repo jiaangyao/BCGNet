@@ -110,7 +110,7 @@ def data_resample(data, fs_ds):
 
 def data_epoch(data, t):
     # mne based epoching
-    return data
+    return mne.Epochs(data, t, tmin=0, tmax=3)
 
 
 if __name__ == '__main__':
