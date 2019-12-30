@@ -32,9 +32,8 @@ def opt_default():
 
 def convert_to_mne(d_ga_removed, opt):
     # put everything into a standard mne format.
-    d_save = Path(opt.d_mne)
-    d_ga_removed = d_save  # some regex operation using
-    d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/')
+    # d_save = Path(opt.d_mne)
+    # d_ga_removed = d_save  # some regex operation using
     d_output = Path('/home/yida/Local/working_eegbcg/test_output/')
 
     for f_input in d_ga_removed.iterdir():
@@ -43,6 +42,7 @@ def convert_to_mne(d_ga_removed, opt):
 
             if not f_output.is_file() or opt.overwrite:
                 data = load_eeglab(f_input)
+                data.opt = opt
                 data_save(data, f_output, overwrite=opt.overwrite)
 
 
