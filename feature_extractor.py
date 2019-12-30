@@ -15,12 +15,11 @@ def opt_default():
                              'd_features', 't_epoch', 'generate', 'fs_ds'])
 
     return Opt(
-        input_feature_type = ['ecg'],
-        output_feature_type = ['eeg'], # if the feature_type opt are None,
-        # then you can specify manually, e.g. opt.input_feature = [0, 1, 2]
-        # or, opt.input_feature = [‘Fz’, ‘Cz’] etc.
-        input_feature = None,
-        output_features = None,
+        # if the feature_type opt are None, then you can specify manually,
+        # e.g. opt.input_feature = [0, 1, 2] or, opt.input_feature =
+        # [‘Fz’, ‘Cz’] etc.
+        input_feature=['ecg'],
+        output_features=['eeg'],
         d_features =  settings.d_root / 'proc_bcgnet/features/',
         t_epoch = 2,
         generate = generate_ws_features,  # train and test within subject.
