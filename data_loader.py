@@ -22,7 +22,7 @@ def opt_default():
     return Opt(
         load_type = load_eeglab,  # function handle to the function that we
         # want to use to load the actual data. To make it easily extensible.
-        d_mne = settings.d_root / 'proc_bcgnet/mne/',  # if I was writing
+        d_mne = 'mne', # settings.d_root / 'proc_bcgnet/mne/',  # if I was writing
         # this myself, I would use environment variables to specify d_root,
         # maybe there are opinions on this...
         run_regex = '?', # capture subject name, session and run
@@ -34,24 +34,23 @@ def convert_to_mne(d_ga_removed, opt):
     # put everything into a standard mne format.
     d_save = Path(opt.d_mne)
     d_ga_removed = d_save  # some regex operation using
+    d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/')
+    d_output = Path('/home/yida/Local/working_eegbcg/test_output/')
 
-    for f_input in d_ga_removed:
-        f_output = f_input # some regex operations on f_input using
-        # opt.run_regex (might need its own function)
-        f_output = d_save / f_output
-        # check if  f_output exists… if it does not (or opt.overwrite is false)
-        # then do following:
-        if not f_output.is_file() or opt.overwrite:
-            data = load_eeglab(f_input)
-            data_save(data, f_output)
+    for f_input in d_ga_removed.iterdir():
+        if f_input.suffix == '.set' and not 'all' in f_input.stem:
+            f_output = d_output / (f_input.stem + '.mat')
 
-    return
+            if not f_output.is_file() or opt.overwrite:
+                data = load_eeglab(f_input)
+                data_save(data, f_output, overwrite=opt.overwrite)
 
 
-def data_save(data, f_output):
+def data_save(data, f_output, overwrite=False):
     # I am thinking scipy.io.savemat (so it should also be matlab readable)
     # we want to save data and also opt - together (we could put opt in data)
-    scipy.io.savemat(str(f_output), {'data': data})
+    # scipy.io.savemat(str(f_output), {'data': data})
+    data.save(str(f_output), overwrite=overwrite)
 
 
 def load_eeglab(f_input):  # see opt.load_type
@@ -63,6 +62,5 @@ def load_eeglab(f_input):  # see opt.load_type
   
 if __name__ == '__main__':
     """ used for debugging """
-    
-
-
+    d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/sub12/')
+    convert_to_mne(d_ga_removed, opt_default())
