@@ -31,7 +31,7 @@ def gen_hash(ps):
     return hash
 
 
-def namedtuple_to_hashable_dict(opt, exclusions=None, **kwargs):
+def namedtuple_to_dict(opt, exclusions=None, **kwargs):
     """Generate a dictionary of items to be hashed"""
     default_exclusions = ['overwrite', 'plot']
     if exclusions:
@@ -53,12 +53,12 @@ def namedtuple_to_hashable_dict(opt, exclusions=None, **kwargs):
     return hashable_dict
 
 
-def dictionary_to_hash(hashable_dict):
-    ip_string = dictionary_to_string(hashable_dict)
+def dict_to_hash(dict, exclusions=None):
+    ip_string = dict_to_string(dict)
     return gen_hash(ip_string)
 
 
-def dictionary_to_string(hashable_dict):
+def dict_to_string(hashable_dict):
     ip_string = ''
     for k, v in hashable_dict.items():
         ip_string = ip_string + k
@@ -73,8 +73,8 @@ if __name__ == "__main__":
     Person = namedtuple('Person', 'name age gender')
     opt = Person(name='John', age=45, gender='male')
 
-    dh = namedtuple_to_hashable_dict(opt)
-    h = dictionary_to_hash(dh, exclusions=None)
+    dh = namedtuple_to_dict(opt)
+    h = dict_to_hash(dh, exclusions=None)
     # h can then be used in the string specification of saved files (so that if you change something in opt
     # you know that the saved file doesn't match). You can add exclusions (as there are somethings that you want to be
     # able to change in opt, without triggering new file generation).

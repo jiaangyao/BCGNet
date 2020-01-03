@@ -4,6 +4,7 @@ from collections import namedtuple
 import contextlib
 import numpy as np
 import settings
+import hash_opt as ho
 
 
 def opt_default():
@@ -20,7 +21,7 @@ def opt_default():
         # [‘Fz’, ‘Cz’] etc.
         input_feature=['ecg'],
         output_features=['eeg'],
-        d_features =  settings.d_root / 'proc_bcgnet/features/',
+        d_features = 'settings.d_root/proc_bcgnet/features/',
         t_epoch = 2,
         generate = generate_ws_features,  # train and test within subject.
         # To test across subject, or test within run we define new functions
@@ -42,59 +43,61 @@ def generate(d_mne, opt):
 
 
 def generate_ws_features(d_mne, opt):
-   # n.b. This is the code that generates features to train and test within
-   # subject… different functions would need to be defined for different
-   # required feature sets. I suggest we start with this one, then see how
-   # we go….
-    d_mne = Path(opt.d_mne)
+    # n.b. This is the code that generates features to train and test within
+    # subject… different functions would need to be defined for different
+    # required feature sets. I suggest we start with this one, then see how
+    # we go….
+    #  d_mne = Path(opt.d_mne)
     d_features = Path(opt.d_features)
-    d_features = d_features / 'something_unique_based_on_opt'  # (I suggest
-   # a hash of opt, combined with some useful human readable stuff)
+    h = ho.dict_to_hash(ho.namedtuple_to_dict(opt), exclusions=None)
+    d_features = d_features / str(h)  # (I suggest a hash of opt, combined
+    # with some useful human readable stuff)
+    return d_features
 
-    dict_files= {}  # a structure that contains organised files. E.g.:
+    # dict_files= {}  # a structure that contains organised files. E.g.:
     # dict_files[‘subject01][0] = [0, 1, 2]  # i.e. [subject][session][run]
 
    # load in all the data - reason for this is that we -might- need to do
    # single run processing based on all runs (data should be small, but we
    # can change this structure if it gets problematic)
-    for sub in dict_files:
-        for session in dict_files[sub]:
-            for run in dict_files[sub][session]:
-                # load each run with MNE and store in dict_data which should be
-                # similar structure to dic_files
-                pass
-
-    dict_data = {}
-
-    for sub in dict_data:
-        for session in dict_data[sub]:
-            for run in dict_data[sub][session]:
-                data = dict_data[sub][session][run]
-                data_resample(data, opt.fs_ds)
-                data_noramlize()
-                data_epoch(data, t)
-                # store back into dict_data
-
-                # we also want to store the epoch_indeces! This is important
-                # so that later if we choose to apply the model on original
-                # data, we can reconstruct what was train/test/validate.
-                # Easiest would be as a list of lists[ [from0, to0],
-                # [from1, to1], … etc.]
-
-    # maybe come up with some epoch rejection criteria here (maybe not, whatever)
-
-    for sub in dict_data:
-        for session in dict_data[sub]:
-            for run in dict_data[sub][session]:
-                data = dict_data[sub][session][run]
-                # stretch, apply epoch rejection criterion
-                # use input_feature_type or input_feature to convert data to X and y
-                # contantate all Xs and all ys (separately)
-
-     # split X, y and epoch_indeces into train/test/validate by using opt spec
-     # save X, y, opt to d_features into a neat package to be loaded… ttv in next module will then generate an arch per package
-
-    return d_features
+   #  for sub in dict_files:
+   #      for session in dict_files[sub]:
+   #          for run in dict_files[sub][session]:
+   #              # load each run with MNE and store in dict_data which should be
+   #              # similar structure to dic_files
+   #              pass
+   #
+   #  dict_data = {}
+   #
+   #  for sub in dict_data:
+   #      for session in dict_data[sub]:
+   #          for run in dict_data[sub][session]:
+   #              data = dict_data[sub][session][run]
+   #              data_resample(data, opt.fs_ds)
+   #              data_noramlize()
+   #              data_epoch(data, t)
+   #              # store back into dict_data
+   #
+   #              # we also want to store the epoch_indeces! This is important
+   #              # so that later if we choose to apply the model on original
+   #              # data, we can reconstruct what was train/test/validate.
+   #              # Easiest would be as a list of lists[ [from0, to0],
+   #              # [from1, to1], … etc.]
+   #
+   #  # maybe come up with some epoch rejection criteria here (maybe not, whatever)
+   #
+   #  for sub in dict_data:
+   #      for session in dict_data[sub]:
+   #          for run in dict_data[sub][session]:
+   #              data = dict_data[sub][session][run]
+   #              # stretch, apply epoch rejection criterion
+   #              # use input_feature_type or input_feature to convert data to X and y
+   #              # contantate all Xs and all ys (separately)
+   #
+   #   # split X, y and epoch_indeces into train/test/validate by using opt spec
+   #   # save X, y, opt to d_features into a neat package to be loaded… ttv in next module will then generate an arch per package
+   #
+   #  return d_features
 
 
 @contextlib.contextmanager
@@ -125,6 +128,12 @@ def data_epoch(data, t):
 
 if __name__ == '__main__':
     """ used for debugging """
+    Person = namedtuple('Person', 'name age gender d_features')
+    opt = Person(name='John', age=45, gender='male', d_features = 'settings.d_root/proc_bcgnet/features/')
+
+    f = generate_ws_features('d_mne', opt)
+    print(f)
+
 
 
 
