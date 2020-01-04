@@ -30,14 +30,13 @@ def opt_default():
     )
 
 
-def convert_to_mne(d_ga_removed, opt):
+def convert_to_mne(d_input, d_output, opt):
     # put everything into a standard mne format.
     # d_save = Path(opt.d_mne)
     # d_ga_removed = d_save  # some regex operation using
-    d_output = Path('/home/yida/Local/working_eegbcg/test_output/')
 
-    for sub in d_ga_removed.iterdir():
-        for run in (d_ga_removed / sub).iterdir():
+    for sub in d_input.iterdir():
+        for run in (d_input / sub).iterdir():
             if run.suffix == '.set' and not 'all' in run.stem\
                     and run.stat().st_size > 0:
                 out_dir = d_output / sub.stem
@@ -67,4 +66,5 @@ def load_eeglab(f_input):  # see opt.load_type
 if __name__ == '__main__':
     """ used for debugging """
     d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/')
-    convert_to_mne(d_ga_removed, opt_default())
+    d_output = Path('/home/yida/Local/working_eegbcg/test_output/')
+    convert_to_mne(d_ga_removed, d_output, opt_default())
