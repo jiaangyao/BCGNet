@@ -36,14 +36,18 @@ def convert_to_mne(d_ga_removed, opt):
     # d_ga_removed = d_save  # some regex operation using
     d_output = Path('/home/yida/Local/working_eegbcg/test_output/')
 
-    for f_input in d_ga_removed.iterdir():
-        if f_input.suffix == '.set' and not 'all' in f_input.stem:
-            f_output = d_output / (f_input.stem + '.mat')
+    for sub in d_ga_removed.iterdir():
+        for run in (d_ga_removed / sub).iterdir():
+            if run.suffix == '.set' and not 'all' in run.stem\
+                    and run.stat().st_size > 0:
+                out_dir = d_output / sub.stem
+                out_dir.mkdir(parents=True, exist_ok=True)
+                out_file = out_dir / (run.stem + '_raw.fif')
 
-            if not f_output.is_file() or opt.overwrite:
-                data = load_eeglab(f_input)
-                data.opt = opt
-                data_save(data, f_output, overwrite=opt.overwrite)
+                if not out_file.is_file() or opt.overwrite:
+                    data = load_eeglab(run)
+                    data.opt = opt
+                    data_save(data, out_file, overwrite=opt.overwrite)
 
 
 def data_save(data, f_output, overwrite=False):
@@ -62,5 +66,5 @@ def load_eeglab(f_input):  # see opt.load_type
   
 if __name__ == '__main__':
     """ used for debugging """
-    d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/sub12/')
+    d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/')
     convert_to_mne(d_ga_removed, opt_default())
