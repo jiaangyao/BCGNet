@@ -1,10 +1,11 @@
 import mne
 from pathlib import Path
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import contextlib
 import numpy as np
 import settings
 import hash_opt as ho
+import mne.io
 
 
 def opt_default():
@@ -48,27 +49,30 @@ def generate_ws_features(d_mne, opt):
     # required feature sets. I suggest we start with this one, then see how
     # we go….
     #  d_mne = Path(opt.d_mne)
-    d_features = Path(opt.d_features)
-    h = ho.dict_to_hash(ho.namedtuple_to_dict(opt), exclusions=None)
-    d_features = d_features / str(h)  # (I suggest a hash of opt, combined
+    # d_features = Path(opt.d_features)
+    # h = ho.dict_to_hash(ho.namedtuple_to_dict(opt), exclusions=None)
+    # d_features = d_features / str(h)  # (I suggest a hash of opt, combined
     # with some useful human readable stuff)
-    return d_features
 
-    # dict_files= {}  # a structure that contains organised files. E.g.:
+    # raw_fname = '/home/yida/Local/working_eegbcg/test_output/sub12_r02_rs_raw.fif'
+    # # Setup for reading the raw data
+    # raw = mne.io.read_raw_fif(raw_fname)
+
+    d_mne = Path('/home/yida/Local/working_eegbcg/test_output')
+    dict_data = defaultdict(dict)  # a structure that contains organised files. E.g.:
     # dict_files[‘subject01][0] = [0, 1, 2]  # i.e. [subject][session][run]
 
-   # load in all the data - reason for this is that we -might- need to do
-   # single run processing based on all runs (data should be small, but we
-   # can change this structure if it gets problematic)
-   #  for sub in dict_files:
-   #      for session in dict_files[sub]:
-   #          for run in dict_files[sub][session]:
-   #              # load each run with MNE and store in dict_data which should be
-   #              # similar structure to dic_files
-   #              pass
-   #
-   #  dict_data = {}
-   #
+    # load in all the data - reason for this is that we -might- need to do
+    # single run processing based on all runs (data should be small, but we
+    # can change this structure if it gets problematic)
+    for sub in d_mne.iterdir():
+        for run in (d_mne / sub).iterdir():
+            # load each run with MNE and store in dict_data which should be
+            # similar structure to dic_files
+            dict_data[sub.stem][run.stem] = mne.io.read_raw_fif(str(run))
+
+    print(dict_data)
+
    #  for sub in dict_data:
    #      for session in dict_data[sub]:
    #          for run in dict_data[sub][session]:
@@ -128,12 +132,11 @@ def data_epoch(data, t):
 
 if __name__ == '__main__':
     """ used for debugging """
-    Person = namedtuple('Person', 'name age gender d_features')
-    opt = Person(name='John', age=45, gender='male', d_features = 'settings.d_root/proc_bcgnet/features/')
+    # Person = namedtuple('Person', 'name age gender d_features')
+    # opt = Person(name='John', age=45, gender='male', d_features = 'settings.d_root/proc_bcgnet/features/')
+    #
+    # f = generate_ws_features('d_mne', opt)
 
-    f = generate_ws_features('d_mne', opt)
-    print(f)
-
-
+    generate_ws_features(None, None)
 
 
