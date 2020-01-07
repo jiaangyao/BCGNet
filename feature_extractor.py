@@ -1,5 +1,6 @@
 import mne
 from pathlib import Path
+from epoch_rejection import single_subject_mabs
 from collections import namedtuple, defaultdict
 import contextlib
 import numpy as np
@@ -12,8 +13,7 @@ def opt_default():
     # this is a function in feature_extractor.py with default settings
     # not sure if there is a type in the channel settings in MNE, but if
     # so that would be the easiest…:
-    Opt = namedtuple('Opt', ['input_feature_type', 'output_feature_type',
-                             'input_feature', 'output_features',
+    Opt = namedtuple('Opt', ['input_feature', 'output_features',
                              'd_features', 't_epoch', 'generate', 'fs_ds'])
 
     return Opt(
@@ -71,25 +71,48 @@ def generate_ws_features(d_mne, opt):
             # similar structure to dic_files
             dict_data[sub.stem][run.stem] = mne.io.read_raw_fif(str(run))
 
-    print(dict_data)
+    for sub in dict_data.keys():
+        for run in dict_data[sub].keys():
+            data = dict_data[sub][run]
+            data.load_data()
+            data_resampled = data_resample(data, opt.fs_ds)
+            rs_data = data_resample(data_resampled, opt.fs_ds)\
+                          .get_data()[64:, :]
+            rs_removed_raw = data_resampled.drop_channels(\
+                ['t0', 't1', 't2', 'r0', 'r1', 'r2'])
 
-   #  for sub in dict_data:
-   #      for session in dict_data[sub]:
-   #          for run in dict_data[sub][session]:
-   #              data = dict_data[sub][session][run]
-   #              data_resample(data, opt.fs_ds)
-   #              data_noramlize()
-   #              data_epoch(data, t)
-   #              # store back into dict_data
-   #
-   #              # we also want to store the epoch_indeces! This is important
-   #              # so that later if we choose to apply the model on original
-   #              # data, we can reconstruct what was train/test/validate.
-   #              # Easiest would be as a list of lists[ [from0, to0],
-   #              # [from1, to1], … etc.]
-   #
-   #  # maybe come up with some epoch rejection criteria here (maybe not, whatever)
-   #
+            normalized_raw, ecg_mean, ecg_std, eeg_mean, eeg_std \
+                = normalize_raw_data_multi_ch(rs_removed_raw)
+
+            # data_normalized = data_normalize(data_resampled)
+
+            # Adding the motion data back into the eeg data
+            rs_renorm = normalize_rs_data_multi_ch(rs_data, opt.fs_ds)
+            normalized_raw.add_channels([rs_renorm], force_update_info=True)
+
+            normalized_raw = modify_motion_data_with_bcg(normalized_raw, opt)
+
+            epoched_data, good_ix = dataset_epoch(dataset=normalized_raw,
+                                                  duration=3,
+                                                  epoch_rejection=True,
+                                                  threshold=5,
+                                                  raw_dataset=data_resampled)
+
+            normalized_raw.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
+            epoched_data.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
+
+            # store back into dict_data
+            # dict_data[sub][run] = data_epoch(data_normalized, t)
+            dict_data[sub][run] = epoched_data
+
+            # we also want to store the epoch_indeces! This is important
+            # so that later if we choose to apply the model on original
+            # data, we can reconstruct what was train/test/validate.
+            # Easiest would be as a list of lists[ [from0, to0],
+            # [from1, to1], … etc.]
+
+    # maybe come up with some epoch rejection criteria here (maybe not, whatever)
+
    #  for sub in dict_data:
    #      for session in dict_data[sub]:
    #          for run in dict_data[sub][session]:
@@ -116,6 +139,89 @@ def temp_seed(seed):
     finally:
         np.random.set_state(state)
 
+def modify_motion_data_with_bcg(rs_set, opt, shift=None):
+    opt_local = opt
+    # if not opt_local.multi_sub and opt_local.use_rs_data and opt_local.multi_ch:
+    # if opt_local.use_rs_data and opt_local.multi_ch:
+    data = rs_set.get_data()
+    info = rs_set.info
+
+    # makes me very nervous!
+    eeg_data = data[0:64, :]
+
+    # This length has to be 6 or else...
+    electrode_list = ['F5', 'F6', 'P5', 'P6', 'TP9', 'TP10']  # also ugly place to put this
+
+    bcg_input = np.zeros((len(electrode_list), np.shape(data)[1]))
+    for ix, electrode in enumerate(electrode_list):
+        bcg_input[ix, :] = data[info['ch_names'].index(electrode), :].reshape(1, -1)
+        if shift:
+            bcg_input[ix, :] = np.roll(bcg_input[ix, :], shift)  # need to check directions
+            # not taking care of the edges - meh, this is just proof of concept
+
+    modified_data = np.append(eeg_data, bcg_input, axis=0)
+    modified_rs_raw = mne.io.RawArray(modified_data, info)
+
+    return modified_rs_raw
+
+# Normalizing the motion data
+def normalize_rs_data_multi_ch(rs_data, fs):
+    rs_info = mne.create_info(['t0', 't1', 't2', 'r0', 'r1', 'r2'], fs,
+                              ['misc', 'misc', 'misc', 'misc', 'misc', 'misc'])
+    transformational_data = rs_data[0:3, :]
+    rotational_data = rs_data[3:, :]
+
+    # transformational_data_renorm = np.append([[0], [0], [0]], np.diff(transformational_data, axis=1) * fs * 1e6, axis=1)
+    transformational_data_renorm = transformational_data * 1e8
+    # used to be 1e9 and derivatives
+    rotational_data_renorm = rotational_data * 1e7
+    # used to be 1e8
+
+    rs_data_renorm = np.insert(transformational_data_renorm, 3, rotational_data_renorm, axis=0)
+    rs_renorm = mne.io.RawArray(rs_data_renorm, rs_info)
+    return rs_renorm
+
+
+# Performing epoching on the raw data set that's provided
+def dataset_epoch(dataset, duration, epoch_rejection, threshold=None, raw_dataset=None, good_ix=None):
+    # Constructing events of duration 10s
+    info = dataset.info
+    fs = info['sfreq']
+
+    total_time_stamps = dataset.get_data().shape[1]
+    constructed_events = np.zeros(shape=(int(np.floor(total_time_stamps/fs)/duration), 3), dtype=int)
+
+    for i in range(0, int(np.floor(total_time_stamps/fs))-duration, duration):
+        ix = i/duration
+        constructed_events[int(ix)] = np.array([i*fs, 0, 1])
+
+    tmax = duration - 1/fs
+
+    # Epoching the data using the constructed event and plotting it
+    old_epoched_data = mne.Epochs(dataset, constructed_events, tmin=0, tmax=tmax)
+
+    if epoch_rejection:
+        # Epoch rejection based on median absolute deviation of mean of absolute values for individual epochs
+        ix = single_subject_mabs(raw_dataset, threshold)
+        good_ix = np.delete(np.arange(0, old_epoched_data.get_data().shape[0], 1), ix)
+        good_data = old_epoched_data.get_data()[good_ix, :, :]
+        epoched_data = mne.EpochsArray(good_data, old_epoched_data.info)
+
+        return epoched_data, good_ix
+    else:
+        epoched_data = old_epoched_data.get_data()[good_ix, :, :]
+        return epoched_data
+
+
+def data_epoch(data, t):
+    # mne based epoching
+    return mne.Epochs(data, t, tmin=0, tmax=3)
+
+
+def data_normalize(data):
+
+    return data
+
 
 def data_resample(data, fs_ds):
     # see bcg_net.py
@@ -125,9 +231,29 @@ def data_resample(data, fs_ds):
     return data
 
 
-def data_epoch(data, t):
-    # mne based epoching
-    return mne.Epochs(data, t, tmin=0, tmax=3)
+# Normalize the data by subtracting the mean and then dividing it by its std for multiple channels
+def normalize_raw_data_multi_ch(raw_data, target_ch=[]):
+    # Assuming that raw data is an mne Raw object
+    data = raw_data.get_data()
+    info = raw_data.info
+    ecg_ch = info['ch_names'].index('ECG')
+    if not target_ch:
+        target_ch = np.delete(np.arange(0, len(info['ch_names']), 1), ecg_ch)
+
+    # used for reverting back to original data later
+    ecg_mean = np.mean(data[ecg_ch, :])
+    ecg_std = np.std(data[ecg_ch, :])
+    eeg_mean = np.mean(data[target_ch, :], axis=1)
+    eeg_std = np.std(data[target_ch, :], axis=1)
+
+    normalizedData = np.zeros(data.shape)
+    for i in range(data.shape[0]):
+        ds = data[i, :] - np.mean(data[i, :])
+        ds /= np.std(ds)
+        normalizedData[i, :] = ds
+
+    normalized_raw = mne.io.RawArray(normalizedData, info)
+    return normalized_raw, ecg_mean, ecg_std, eeg_mean, eeg_std
 
 
 if __name__ == '__main__':
@@ -137,6 +263,6 @@ if __name__ == '__main__':
     #
     # f = generate_ws_features('d_mne', opt)
 
-    generate_ws_features(None, None)
+    generate_ws_features(None, opt_default())
 
 
