@@ -48,15 +48,11 @@ def generate_ws_features(d_mne, opt):
     # subject… different functions would need to be defined for different
     # required feature sets. I suggest we start with this one, then see how
     # we go….
-    #  d_mne = Path(opt.d_mne)
-    # d_features = Path(opt.d_features)
-    # h = ho.dict_to_hash(ho.namedtuple_to_dict(opt), exclusions=None)
-    # d_features = d_features / str(h)  # (I suggest a hash of opt, combined
+    # d_mne = Path(opt.d_mne)
+    d_features = Path(opt.d_features)
+    h = ho.dict_to_hash(ho.namedtuple_to_dict(opt), exclusions=None)
+    d_features = d_features / str(h)  # (I suggest a hash of opt, combined
     # with some useful human readable stuff)
-
-    # raw_fname = '/home/yida/Local/working_eegbcg/test_output/sub12_r02_rs_raw.fif'
-    # # Setup for reading the raw data
-    # raw = mne.io.read_raw_fif(raw_fname)
 
     d_mne = Path('/home/yida/Local/working_eegbcg/test_output')
     dict_data = defaultdict(dict)  # a structure that contains organised files. E.g.:
@@ -84,8 +80,6 @@ def generate_ws_features(d_mne, opt):
             normalized_raw, ecg_mean, ecg_std, eeg_mean, eeg_std \
                 = normalize_raw_data_multi_ch(rs_removed_raw)
 
-            # data_normalized = data_normalize(data_resampled)
-
             # Adding the motion data back into the eeg data
             rs_renorm = normalize_rs_data_multi_ch(rs_data, opt.fs_ds)
             normalized_raw.add_channels([rs_renorm], force_update_info=True)
@@ -102,7 +96,6 @@ def generate_ws_features(d_mne, opt):
             epoched_data.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
 
             # store back into dict_data
-            # dict_data[sub][run] = data_epoch(data_normalized, t)
             dict_data[sub][run] = epoched_data
 
             # we also want to store the epoch_indeces! This is important
