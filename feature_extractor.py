@@ -7,6 +7,7 @@ import numpy as np
 import settings
 import hash_opt as ho
 import mne.io
+import itertools
 
 
 def opt_default():
@@ -56,6 +57,7 @@ def generate_ws_features(d_mne, opt):
 
     d_mne = Path('/home/yida/Local/working_eegbcg/test_output')
     dict_data = defaultdict(dict)  # a structure that contains organised files. E.g.:
+    dict_index = defaultdict(dict)
     # dict_files[‘subject01][0] = [0, 1, 2]  # i.e. [subject][session][run]
 
     # load in all the data - reason for this is that we -might- need to do
@@ -72,9 +74,9 @@ def generate_ws_features(d_mne, opt):
             data = dict_data[sub][run]
             data.load_data()
             data_resampled = data_resample(data, opt.fs_ds)
-            rs_data = data_resample(data_resampled, opt.fs_ds)\
-                          .get_data()[64:, :]
-            rs_removed_raw = data_resampled.drop_channels(\
+            rs_data = data_resample(data_resampled, opt.fs_ds).get_data() \
+                [64:, :]
+            rs_removed_raw = data_resampled.drop_channels(
                 ['t0', 't1', 't2', 'r0', 'r1', 'r2'])
 
             normalized_raw, ecg_mean, ecg_std, eeg_mean, eeg_std \
@@ -84,7 +86,7 @@ def generate_ws_features(d_mne, opt):
             rs_renorm = normalize_rs_data_multi_ch(rs_data, opt.fs_ds)
             normalized_raw.add_channels([rs_renorm], force_update_info=True)
 
-            normalized_raw = modify_motion_data_with_bcg(normalized_raw, opt)
+            # normalized_raw = modify_motion_data_with_bcg(normalized_raw, opt)
 
             epoched_data, good_ix = dataset_epoch(dataset=normalized_raw,
                                                   duration=3,
@@ -92,8 +94,8 @@ def generate_ws_features(d_mne, opt):
                                                   threshold=5,
                                                   raw_dataset=data_resampled)
 
-            normalized_raw.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
-            epoched_data.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
+            # normalized_raw.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
+            # epoched_data.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
 
             # store back into dict_data
             dict_data[sub][run] = epoched_data
@@ -103,21 +105,28 @@ def generate_ws_features(d_mne, opt):
             # data, we can reconstruct what was train/test/validate.
             # Easiest would be as a list of lists[ [from0, to0],
             # [from1, to1], … etc.]
+            dict_index[sub][run] = list(get_index_range(good_ix))
 
     # maybe come up with some epoch rejection criteria here (maybe not, whatever)
 
-   #  for sub in dict_data:
-   #      for session in dict_data[sub]:
-   #          for run in dict_data[sub][session]:
-   #              data = dict_data[sub][session][run]
-   #              # stretch, apply epoch rejection criterion
-   #              # use input_feature_type or input_feature to convert data to X and y
-   #              # contantate all Xs and all ys (separately)
-   #
-   #   # split X, y and epoch_indeces into train/test/validate by using opt spec
-   #   # save X, y, opt to d_features into a neat package to be loaded… ttv in next module will then generate an arch per package
-   #
-   #  return d_features
+    for sub in dict_data.keys():
+        for run in dict_data[sub].keys():
+            data = dict_data[sub][run]
+
+            # stretch, apply epoch rejection criterion
+            # use input_feature_type or input_feature to convert data to X and y
+            # contantate all Xs and all ys (separately)
+
+     # split X, y and epoch_indeces into train/test/validate by using opt spec
+     # save X, y, opt to d_features into a neat package to be loaded… ttv in next module will then generate an arch per package
+
+    return d_features
+
+
+def get_index_range(i):
+    for a, b in itertools.groupby(enumerate(i), lambda pair: pair[1] - pair[0]):
+        b = list(b)
+        yield b[0][1], b[-1][1]
 
 
 @contextlib.contextmanager
