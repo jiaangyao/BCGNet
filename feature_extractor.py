@@ -8,6 +8,7 @@ import settings
 import hash_opt as ho
 import mne.io
 import itertools
+import pickle
 
 
 def opt_default():
@@ -23,7 +24,7 @@ def opt_default():
         # [‘Fz’, ‘Cz’] etc.
         input_feature=['ecg'],
         output_features=['eeg'],
-        d_features = 'settings.d_root/proc_bcgnet/features/',
+        d_features = settings.d_root / 'Local/working_eegbcg/proc_bcgnet/features/',
         t_epoch = 2,
         generate = generate_ws_features,  # train and test within subject.
         # To test across subject, or test within run we define new functions
@@ -109,6 +110,14 @@ def generate_ws_features(d_mne, opt):
 
     # maybe come up with some epoch rejection criteria here (maybe not, whatever)
 
+    filehandler = open(opt.d_features / "features.obj", "wb")
+    pickle.dump(dict_data, filehandler)
+    filehandler.close()
+
+    filehandler = open(opt.d_features / "features_index.obj", "wb")
+    pickle.dump(dict_index, filehandler)
+    filehandler.close()
+
     for sub in dict_data.keys():
         for run in dict_data[sub].keys():
             data = dict_data[sub][run]
@@ -117,8 +126,9 @@ def generate_ws_features(d_mne, opt):
             # use input_feature_type or input_feature to convert data to X and y
             # contantate all Xs and all ys (separately)
 
-     # split X, y and epoch_indeces into train/test/validate by using opt spec
-     # save X, y, opt to d_features into a neat package to be loaded… ttv in next module will then generate an arch per package
+    # split X, y and epoch_indeces into train/test/validate by using opt spec
+    # save X, y, opt to d_features into a neat package to be loaded… ttv in
+    # next module will then generate an arch per package
 
     return d_features
 
@@ -265,6 +275,7 @@ if __name__ == '__main__':
     #
     # f = generate_ws_features('d_mne', opt)
 
+    settings.init(Path.home(), Path.home())  # Call only once
     generate_ws_features(None, opt_default())
 
 
