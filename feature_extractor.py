@@ -16,7 +16,9 @@ def opt_default():
     # not sure if there is a type in the channel settings in MNE, but if
     # so that would be the easiest…:
     Opt = namedtuple('Opt', ['input_feature', 'output_features',
-                             'd_features', 't_epoch', 'generate', 'fs_ds'])
+                             'd_features', 't_epoch', 'generate',
+                             'fs_ds', 'use_rs_data', 'target_ch',
+                             'multi_ch', 'validation', 'evaluation'])
 
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
@@ -30,8 +32,13 @@ def opt_default():
         # To test across subject, or test within run we define new functions
         # here some extensions might fit neatly within generate_ws_features,
         # for some we might need entirely new functions specified here.
-        fs_ds = 100 # frequency at which to downsample (this gets inverted
+        fs_ds = 100, # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
+        use_rs_data = True,
+        target_ch = None,
+        multi_ch = True,
+        validation = 0.15,
+        evaluation = 0.85
     )
 
 
@@ -58,6 +65,7 @@ def generate_ws_features(d_mne, opt):
 
     d_mne = Path('/home/yida/Local/working_eegbcg/test_output')
     dict_data = defaultdict(dict)  # a structure that contains organised files. E.g.:
+    dict_data_splitted = defaultdict(dict)
     dict_index = defaultdict(dict)
     # dict_files[‘subject01][0] = [0, 1, 2]  # i.e. [subject][session][run]
 
@@ -110,25 +118,45 @@ def generate_ws_features(d_mne, opt):
 
     # maybe come up with some epoch rejection criteria here (maybe not, whatever)
 
+    for sub in dict_data.keys():
+        for run in dict_data[sub].keys():
+            # stretch, apply epoch rejection criterion
+            # use input_feature_type or input_feature to convert data to X and y
+            # contantate all Xs and all ys (separately)
+            vec_epoched_data = list(dict_data[sub].values())
+            epoched_data_combined = None
+
+            for j in range(len(vec_epoched_data)):
+                if j == 0:
+                    epoched_data_combined = vec_epoched_data[j]
+                else:
+                    epoched_data_combined = mne.concatenate_epochs\
+                        ([epoched_data_combined, vec_epoched_data[j]])
+
+            x_train, x_validation, x_test, y_train, y_validation, \
+            y_test, vec_ix_slice_test = \
+                generate_train_valid_test(epoched_data_combined, opt)
+
+            dict_data_splitted[sub]['x_train'] = x_train
+            dict_data_splitted[sub]['x_validation'] = x_validation
+            dict_data_splitted[sub]['x_test'] = x_test
+            dict_data_splitted[sub]['y_train'] = y_train
+            dict_data_splitted[sub]['y_validation'] = y_validation
+            dict_data_splitted[sub]['y_test'] = y_test
+            dict_data_splitted[sub]['vec_ix_slice_test'] = vec_ix_slice_test
+
+
+    # split X, y and epoch_indeces into train/test/validate by using opt spec
+    # save X, y, opt to d_features into a neat package to be loaded… ttv in
+    # next module will then generate an arch per package
+
     filehandler = open(opt.d_features / "features.obj", "wb")
-    pickle.dump(dict_data, filehandler)
+    pickle.dump(dict_data_splitted, filehandler)
     filehandler.close()
 
     filehandler = open(opt.d_features / "features_index.obj", "wb")
     pickle.dump(dict_index, filehandler)
     filehandler.close()
-
-    for sub in dict_data.keys():
-        for run in dict_data[sub].keys():
-            data = dict_data[sub][run]
-
-            # stretch, apply epoch rejection criterion
-            # use input_feature_type or input_feature to convert data to X and y
-            # contantate all Xs and all ys (separately)
-
-    # split X, y and epoch_indeces into train/test/validate by using opt spec
-    # save X, y, opt to d_features into a neat package to be loaded… ttv in
-    # next module will then generate an arch per package
 
     return d_features
 
@@ -150,6 +178,111 @@ def temp_seed(seed):
         yield
     finally:
         np.random.set_state(state)
+
+
+def generate_train_valid_test(epoched_data, opt=None):
+    opt_local = opt
+    normalizedData = epoched_data.get_data()
+    ecg_ch = epoched_data.info['ch_names'].index('ECG')
+
+    if opt_local.use_rs_data:
+        rs_ch = np.arange(64, 70, 1)
+
+    if opt_local.target_ch is None:
+        target_ch = np.delete(np.arange(0, len(epoched_data.info['ch_names']), 1), ecg_ch)
+
+    num_epochs = normalizedData.shape[0]
+    batch_size = normalizedData.shape[2]
+
+    with temp_seed(1997):
+        if not opt_local.multi_ch:
+            if opt_local.validation is None:
+                s_ev_train, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
+                x_ev_train = s_ev_train[:, ecg_ch, :].reshape(int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+                x_test = s_test[:,ecg_ch,:].reshape(num_epochs - int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+
+                y_ev_train = s_ev_train[:, target_ch, :].reshape(int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+                y_test = s_test[:,target_ch,:].reshape(num_epochs - int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+
+            else:
+                s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
+                ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
+                per_validation = int(np.round(opt_local.validation * num_epochs)) / ev_epoch_num
+                s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
+
+                x_ev_train = s_ev_train[:, ecg_ch, :].reshape(ev_epoch_num - int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
+                x_ev_validation = s_ev_va[:, ecg_ch, :].reshape(int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
+                x_test = s_test[:,ecg_ch,:].reshape(num_epochs - ev_epoch_num, batch_size)
+
+                y_ev_train = s_ev_train[:, target_ch, :].reshape(ev_epoch_num - int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
+                y_ev_validation = s_ev_va[:, target_ch, :].reshape(int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
+                y_test = s_test[:,target_ch,:].reshape(num_epochs - ev_epoch_num, batch_size)
+
+        else:
+            if opt_local.validation is None and not opt_local.use_rs_data:
+                s_ev_train, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
+                x_ev_train = s_ev_train[:, ecg_ch, :].reshape(int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+                x_test = s_test[:, ecg_ch, :].reshape(num_epochs - int(np.round(num_epochs * opt_local.evaluation)),
+                                                      batch_size)
+
+                y_ev_train = np.transpose(np.delete(s_ev_train, ecg_ch, axis=1), axes=(1, 0, 2))
+                y_test = np.transpose(np.delete(s_test, ecg_ch, axis=1), axes=(1, 0, 2))
+
+            elif opt_local.validation is not None and not opt_local.use_rs_data:
+                s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
+                ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
+                per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
+                s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
+
+                x_ev_train = s_ev_train[:, ecg_ch, :]
+                x_ev_validation = s_ev_va[:, ecg_ch, :]
+                x_test = s_test[:, ecg_ch, :]
+
+                y_ev_train = np.transpose(np.delete(s_ev_train, ecg_ch, axis=1), axes=(1, 0, 2))
+                y_ev_validation = np.transpose(np.delete(s_ev_va, ecg_ch, axis=1), axes=(1, 0, 2))
+                y_test = np.transpose(np.delete(s_test, ecg_ch, axis=1), axes=(1, 0, 2))
+
+            elif opt_local.validation is not None and opt_local.use_rs_data:
+                s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
+                ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
+                per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
+                s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
+
+                x_ev_train = np.transpose(s_ev_train[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
+                x_ev_validation = np.transpose(s_ev_va[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
+                x_test = np.transpose(s_test[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
+
+                y_ev_train = np.transpose(np.delete(s_ev_train, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
+                y_ev_validation = np.transpose(np.delete(s_ev_va, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
+                y_test = np.transpose(np.delete(s_test, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
+
+    return x_ev_train, x_ev_validation, x_test, y_ev_train, y_ev_validation, y_test, vec_ix_slice_test
+
+
+# Obtain the test set from the rest of the data
+def split_evaluation_test(epoched_data, per_evaluation):
+    vec_ix = np.random.permutation(len(epoched_data))
+    vec_ix_cutoff = int(np.round(len(epoched_data) * per_evaluation))
+    vec_ix_slice_evaluation = vec_ix[:vec_ix_cutoff]
+    epochs_evaluation = epoched_data[vec_ix_slice_evaluation, :, :]
+
+    vec_ix_slice_test = vec_ix[vec_ix_cutoff:]
+    epochs_test = epoched_data[vec_ix_slice_test, :, :]
+
+    return epochs_evaluation, epochs_test, vec_ix_slice_test
+
+
+# Splits evaluation data into training set and validation set
+def split_train_validation(epochs_evaluation, es_validation):
+    vec_ix = np.random.permutation(len(epochs_evaluation))
+    vec_ix_cutoff = int(np.round(len(epochs_evaluation) * es_validation))
+    vec_ix_slice_train = vec_ix[vec_ix_cutoff:]
+    epochs_train = epochs_evaluation[vec_ix_slice_train, :, :]
+
+    vec_ix_slice_val = vec_ix[:vec_ix_cutoff]
+    epochs_validation = epochs_evaluation[vec_ix_slice_val, :, :]
+    return epochs_train, epochs_validation
+
 
 def modify_motion_data_with_bcg(rs_set, opt, shift=None):
     opt_local = opt
