@@ -17,7 +17,7 @@ def opt_default():
     # so that would be the easiest…:
     Opt = namedtuple('Opt', ['input_feature', 'output_features',
                              'd_features', 't_epoch', 'generate',
-                             'fs_ds', 'target_ch', 'validation', 'evaluation'])
+                             'fs_ds', 'validation', 'evaluation'])
 
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
@@ -33,7 +33,6 @@ def opt_default():
         # for some we might need entirely new functions specified here.
         fs_ds = 100, # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
-        target_ch = None,
         validation = 0.15,
         evaluation = 0.85
     )
@@ -182,9 +181,7 @@ def generate_train_valid_test(epoched_data, opt=None):
     normalizedData = epoched_data.get_data()
     ecg_ch = epoched_data.info['ch_names'].index('ECG')
     rs_ch = np.arange(64, 70, 1)
-
-    if opt_local.target_ch is None:
-        target_ch = np.delete(np.arange(0, len(epoched_data.info['ch_names']), 1), ecg_ch)
+    target_ch = np.delete(np.arange(0, len(epoched_data.info['ch_names']), 1), ecg_ch)
 
     num_epochs = normalizedData.shape[0]
     batch_size = normalizedData.shape[2]
@@ -328,6 +325,7 @@ def normalize_raw_data_multi_ch(raw_data, target_ch=[]):
     data = raw_data.get_data()
     info = raw_data.info
     ecg_ch = info['ch_names'].index('ECG')
+
     if not target_ch:
         target_ch = np.delete(np.arange(0, len(info['ch_names']), 1), ecg_ch)
 
