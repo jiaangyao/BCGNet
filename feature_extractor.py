@@ -17,8 +17,7 @@ def opt_default():
     # so that would be the easiest…:
     Opt = namedtuple('Opt', ['input_feature', 'output_features',
                              'd_features', 't_epoch', 'generate',
-                             'fs_ds', 'target_ch','multi_ch',
-                             'validation', 'evaluation'])
+                             'fs_ds', 'target_ch', 'validation', 'evaluation'])
 
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
@@ -35,7 +34,6 @@ def opt_default():
         fs_ds = 100, # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
         target_ch = None,
-        multi_ch = True,
         validation = 0.15,
         evaluation = 0.85
     )
@@ -192,43 +190,19 @@ def generate_train_valid_test(epoched_data, opt=None):
     batch_size = normalizedData.shape[2]
 
     with temp_seed(1997):
-        if not opt_local.multi_ch:
-            if opt_local.validation is None:
-                s_ev_train, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
-                x_ev_train = s_ev_train[:, ecg_ch, :].reshape(int(np.round(num_epochs * opt_local.evaluation)), batch_size)
-                x_test = s_test[:,ecg_ch,:].reshape(num_epochs - int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+        if opt_local.validation is not None:
+            s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
+            ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
+            per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
+            s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
 
-                y_ev_train = s_ev_train[:, target_ch, :].reshape(int(np.round(num_epochs * opt_local.evaluation)), batch_size)
-                y_test = s_test[:,target_ch,:].reshape(num_epochs - int(np.round(num_epochs * opt_local.evaluation)), batch_size)
+            x_ev_train = np.transpose(s_ev_train[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
+            x_ev_validation = np.transpose(s_ev_va[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
+            x_test = np.transpose(s_test[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
 
-            else:
-                s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
-                ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
-                per_validation = int(np.round(opt_local.validation * num_epochs)) / ev_epoch_num
-                s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
-
-                x_ev_train = s_ev_train[:, ecg_ch, :].reshape(ev_epoch_num - int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
-                x_ev_validation = s_ev_va[:, ecg_ch, :].reshape(int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
-                x_test = s_test[:,ecg_ch,:].reshape(num_epochs - ev_epoch_num, batch_size)
-
-                y_ev_train = s_ev_train[:, target_ch, :].reshape(ev_epoch_num - int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
-                y_ev_validation = s_ev_va[:, target_ch, :].reshape(int(np.round(ev_epoch_num * opt_local.validation)), batch_size)
-                y_test = s_test[:,target_ch,:].reshape(num_epochs - ev_epoch_num, batch_size)
-
-        else:
-            if opt_local.validation is not None:
-                s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
-                ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
-                per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
-                s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
-
-                x_ev_train = np.transpose(s_ev_train[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
-                x_ev_validation = np.transpose(s_ev_va[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
-                x_test = np.transpose(s_test[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
-
-                y_ev_train = np.transpose(np.delete(s_ev_train, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
-                y_ev_validation = np.transpose(np.delete(s_ev_va, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
-                y_test = np.transpose(np.delete(s_test, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
+            y_ev_train = np.transpose(np.delete(s_ev_train, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
+            y_ev_validation = np.transpose(np.delete(s_ev_va, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
+            y_test = np.transpose(np.delete(s_test, np.insert(rs_ch, 0, ecg_ch), axis=1), axes=(1, 0, 2))
 
     return x_ev_train, x_ev_validation, x_test, y_ev_train, y_ev_validation, y_test, vec_ix_slice_test
 
