@@ -117,6 +117,8 @@ def generate_ws_features(d_mne, opt):
 
     # maybe come up with some epoch rejection criteria here (maybe not, whatever)
 
+    vec_data = []
+
     for sub in dict_data.keys():
         for run in dict_data[sub].keys():
             # stretch, apply epoch rejection criterion
@@ -136,21 +138,24 @@ def generate_ws_features(d_mne, opt):
             y_test, vec_ix_slice_test = \
                 generate_train_valid_test(epoched_data_combined, opt)
 
-            dict_data_splitted[sub]['x_train'] = x_train
-            dict_data_splitted[sub]['x_validation'] = x_validation
-            dict_data_splitted[sub]['x_test'] = x_test
-            dict_data_splitted[sub]['y_train'] = y_train
-            dict_data_splitted[sub]['y_validation'] = y_validation
-            dict_data_splitted[sub]['y_test'] = y_test
-            dict_data_splitted[sub]['vec_ix_slice_test'] = vec_ix_slice_test
+            data_subj = {
+                'x_train': x_train,
+                'x_validation': x_validation,
+                'x_test': x_test,
+                'y_train': y_train,
+                'y_validation': y_validation,
+                'y_test': y_test,
+                'vec_ix_slice_test': vec_ix_slice_test
+            }
 
+            vec_data.append(data_subj)
 
     # split X, y and epoch_indeces into train/test/validate by using opt spec
     # save X, y, opt to d_features into a neat package to be loaded… ttv in
     # next module will then generate an arch per package
 
     filehandler = open(opt.d_features / "features.obj", "wb")
-    pickle.dump(dict_data_splitted, filehandler)
+    pickle.dump(vec_data, filehandler)
     filehandler.close()
 
     filehandler = open(opt.d_features / "features_index.obj", "wb")
