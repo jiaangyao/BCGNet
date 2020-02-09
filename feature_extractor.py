@@ -17,7 +17,8 @@ def opt_default():
     # so that would be the easiest…:
     Opt = namedtuple('Opt', ['input_feature', 'output_features',
                              'd_features', 't_epoch', 'generate',
-                             'fs_ds', 'validation', 'evaluation'])
+                             'fs_ds', 'p_training', 'p_validation',
+                             'p_evaluation'])
 
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
@@ -33,8 +34,9 @@ def opt_default():
         # for some we might need entirely new functions specified here.
         fs_ds = 100, # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
-        validation = 0.15,
-        evaluation = 0.85
+        p_training = 0,
+        p_validation = 0.15,
+        p_evaluation = 0.85
     )
 
 
@@ -44,6 +46,7 @@ def generate(d_mne, opt):
 
     # Assert that of  [opt.output_features, opt.output_feature_type], exactly
     # one is none, do same for input
+    assert opt.p_training + opt.p_validation + opt.p_evaluation == 1
     d_features = opt.generate(d_mne, opt)  # so that we can easily switch it out
     return d_features
 
@@ -187,10 +190,10 @@ def generate_train_valid_test(epoched_data, opt=None):
     batch_size = normalizedData.shape[2]
 
     with temp_seed(1997):
-        if opt_local.validation is not None:
-            s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
-            ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
-            per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
+        if opt_local.p_validation is not None:
+            s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.p_evaluation)
+            ev_epoch_num = int(np.round(num_epochs * opt_local.p_evaluation))
+            per_validation = int(np.round(opt_local.p_validation * num_epochs))/ev_epoch_num
             s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
 
             x_ev_train = np.transpose(s_ev_train[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
