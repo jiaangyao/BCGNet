@@ -17,8 +17,8 @@ def opt_default():
     # so that would be the easiest…:
     Opt = namedtuple('Opt', ['input_feature', 'output_features',
                              'd_features', 't_epoch', 'generate',
-                             'fs_ds', 'use_rs_data', 'target_ch',
-                             'multi_ch', 'validation', 'evaluation'])
+                             'fs_ds', 'target_ch','multi_ch',
+                             'validation', 'evaluation'])
 
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
@@ -34,7 +34,6 @@ def opt_default():
         # for some we might need entirely new functions specified here.
         fs_ds = 100, # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
-        use_rs_data = True,
         target_ch = None,
         multi_ch = True,
         validation = 0.15,
@@ -184,9 +183,7 @@ def generate_train_valid_test(epoched_data, opt=None):
     opt_local = opt
     normalizedData = epoched_data.get_data()
     ecg_ch = epoched_data.info['ch_names'].index('ECG')
-
-    if opt_local.use_rs_data:
-        rs_ch = np.arange(64, 70, 1)
+    rs_ch = np.arange(64, 70, 1)
 
     if opt_local.target_ch is None:
         target_ch = np.delete(np.arange(0, len(epoched_data.info['ch_names']), 1), ecg_ch)
@@ -219,30 +216,7 @@ def generate_train_valid_test(epoched_data, opt=None):
                 y_test = s_test[:,target_ch,:].reshape(num_epochs - ev_epoch_num, batch_size)
 
         else:
-            if opt_local.validation is None and not opt_local.use_rs_data:
-                s_ev_train, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
-                x_ev_train = s_ev_train[:, ecg_ch, :].reshape(int(np.round(num_epochs * opt_local.evaluation)), batch_size)
-                x_test = s_test[:, ecg_ch, :].reshape(num_epochs - int(np.round(num_epochs * opt_local.evaluation)),
-                                                      batch_size)
-
-                y_ev_train = np.transpose(np.delete(s_ev_train, ecg_ch, axis=1), axes=(1, 0, 2))
-                y_test = np.transpose(np.delete(s_test, ecg_ch, axis=1), axes=(1, 0, 2))
-
-            elif opt_local.validation is not None and not opt_local.use_rs_data:
-                s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
-                ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
-                per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
-                s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
-
-                x_ev_train = s_ev_train[:, ecg_ch, :]
-                x_ev_validation = s_ev_va[:, ecg_ch, :]
-                x_test = s_test[:, ecg_ch, :]
-
-                y_ev_train = np.transpose(np.delete(s_ev_train, ecg_ch, axis=1), axes=(1, 0, 2))
-                y_ev_validation = np.transpose(np.delete(s_ev_va, ecg_ch, axis=1), axes=(1, 0, 2))
-                y_test = np.transpose(np.delete(s_test, ecg_ch, axis=1), axes=(1, 0, 2))
-
-            elif opt_local.validation is not None and opt_local.use_rs_data:
+            if opt_local.validation is not None:
                 s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.evaluation)
                 ev_epoch_num = int(np.round(num_epochs * opt_local.evaluation))
                 per_validation = int(np.round(opt_local.validation * num_epochs))/ev_epoch_num
@@ -286,8 +260,6 @@ def split_train_validation(epochs_evaluation, es_validation):
 
 def modify_motion_data_with_bcg(rs_set, opt, shift=None):
     opt_local = opt
-    # if not opt_local.multi_sub and opt_local.use_rs_data and opt_local.multi_ch:
-    # if opt_local.use_rs_data and opt_local.multi_ch:
     data = rs_set.get_data()
     info = rs_set.info
 
