@@ -196,10 +196,10 @@ def generate_train_valid_test(epoched_data, opt=None):
 
     with temp_seed(1997):
         if opt_local.p_validation is not None:
-            s_ev, s_test, vec_ix_slice_test = split_evaluation_test(normalizedData, opt_local.p_evaluation)
+            s_ev, s_test, _, vec_ix_slice_test = split_data(normalizedData, opt_local.p_evaluation)
             ev_epoch_num = int(np.round(num_epochs * opt_local.p_evaluation))
             per_validation = int(np.round(opt_local.p_validation * num_epochs))/ev_epoch_num
-            s_ev_train, s_ev_va = split_train_validation(s_ev, per_validation)
+            s_ev_va, s_ev_train, _, _ = split_data(s_ev, per_validation)
 
             x_ev_train = np.transpose(s_ev_train[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
             x_ev_validation = np.transpose(s_ev_va[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
@@ -212,29 +212,17 @@ def generate_train_valid_test(epoched_data, opt=None):
     return x_ev_train, x_ev_validation, x_test, y_ev_train, y_ev_validation, y_test, vec_ix_slice_test
 
 
-# Obtain the test set from the rest of the data
-def split_evaluation_test(epoched_data, per_evaluation):
+# Split the epoched data into two parts using percentage as a cutoff
+def split_data(epoched_data, percentage):
     vec_ix = np.random.permutation(len(epoched_data))
-    vec_ix_cutoff = int(np.round(len(epoched_data) * per_evaluation))
-    vec_ix_slice_evaluation = vec_ix[:vec_ix_cutoff]
-    epochs_evaluation = epoched_data[vec_ix_slice_evaluation, :, :]
+    vec_ix_cutoff = int(np.round(len(epoched_data) * percentage))
+    vec_ix_first_part = vec_ix[:vec_ix_cutoff]
+    epochs_first_part = epoched_data[vec_ix_first_part, :, :]
 
-    vec_ix_slice_test = vec_ix[vec_ix_cutoff:]
-    epochs_test = epoched_data[vec_ix_slice_test, :, :]
+    vec_ix_second_part = vec_ix[vec_ix_cutoff:]
+    epochs_second_part = epoched_data[vec_ix_second_part, :, :]
 
-    return epochs_evaluation, epochs_test, vec_ix_slice_test
-
-
-# Splits evaluation data into training set and validation set
-def split_train_validation(epochs_evaluation, es_validation):
-    vec_ix = np.random.permutation(len(epochs_evaluation))
-    vec_ix_cutoff = int(np.round(len(epochs_evaluation) * es_validation))
-    vec_ix_slice_train = vec_ix[vec_ix_cutoff:]
-    epochs_train = epochs_evaluation[vec_ix_slice_train, :, :]
-
-    vec_ix_slice_val = vec_ix[:vec_ix_cutoff]
-    epochs_validation = epochs_evaluation[vec_ix_slice_val, :, :]
-    return epochs_train, epochs_validation
+    return epochs_first_part, epochs_second_part, vec_ix_first_part, vec_ix_second_part
 
 
 def modify_motion_data_with_bcg(rs_set, opt, shift=None):
