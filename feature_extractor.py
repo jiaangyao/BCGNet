@@ -153,6 +153,7 @@ def generate_ws_features(d_mne, opt):
     # split X, y and epoch_indeces into train/test/validate by using opt spec
     # save X, y, opt to d_features into a neat package to be loaded… ttv in
     # next module will then generate an arch per package
+    # scipy.io.savemat(str(opt.d_features / "features.obj"), {'data': vec_data})
 
     filehandler = open(opt.d_features / "features.obj", "wb")
     pickle.dump(vec_data, filehandler)
