@@ -8,17 +8,19 @@ import settings
 import hash_opt as ho
 import mne.io
 import itertools
-import pickle
+import dill
+
+
+Opt = namedtuple('Opt', ['input_feature', 'output_features',
+                         'd_features', 't_epoch', 'generate',
+                         'fs_ds', 'p_training', 'p_validation',
+                         'p_evaluation'])
 
 
 def opt_default():
     # this is a function in feature_extractor.py with default settings
     # not sure if there is a type in the channel settings in MNE, but if
     # so that would be the easiest…:
-    Opt = namedtuple('Opt', ['input_feature', 'output_features',
-                             'd_features', 't_epoch', 'generate',
-                             'fs_ds', 'p_training', 'p_validation',
-                             'p_evaluation'])
 
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
@@ -64,7 +66,6 @@ def generate_ws_features(d_mne, opt):
 
     d_mne = Path('/home/yida/Local/working_eegbcg/test_output')
     dict_data = defaultdict(dict)  # a structure that contains organised files. E.g.:
-    dict_data_splitted = defaultdict(dict)
     dict_index = defaultdict(dict)
     # dict_files[‘subject01][0] = [0, 1, 2]  # i.e. [subject][session][run]
 
@@ -155,12 +156,14 @@ def generate_ws_features(d_mne, opt):
     # next module will then generate an arch per package
     # scipy.io.savemat(str(opt.d_features / "features.obj"), {'data': vec_data})
 
-    filehandler = open(opt.d_features / "features.obj", "wb")
-    pickle.dump(vec_data, filehandler)
-    filehandler.close()
+    data_dict = {
+        'data': vec_data,
+        'opt': opt,
+        'dict_index': dict_index
+    }
 
-    filehandler = open(opt.d_features / "features_index.obj", "wb")
-    pickle.dump(dict_index, filehandler)
+    filehandler = open(opt.d_features / "features.obj", "wb")
+    dill.dump(data_dict, filehandler)
     filehandler.close()
 
     return d_features
