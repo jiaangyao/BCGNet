@@ -6,6 +6,8 @@ import settings
 import bcg_net_architecture
 import bcg_net_architecture.arch0001
 import dill
+import numpy as np
+import matplotlib as plt
 
 
 Opt = namedtuple('Opt', ['input_feature', 'output_features',
@@ -54,12 +56,64 @@ def train(d_features, opt):
     model = bcg_net_architecture.arch0001.create_arch\
         (n_input, n_output, data_dict['opt'])
 
-    f_arch = 'arch_epoch_{}_fs_{}'.format(opt_local.t_epoch, opt_local.fs_ds)
+    f_arch = opt_local.d_features / 'arch_epoch_{}_fs_{}'.format(opt_local.t_epoch, opt_local.fs_ds)
     overwrite = False
 
     for x_train, x_validation, x_test, y_train, y_validation, y_test, \
         vec_ix_slice_test in data:
-        pass
+
+        # Generator for the training set, the output is a tuple of the xs and ys
+        def train_generator():
+            ix = 0
+            if opt_local.use_rs_data:
+                vec_ix = np.random.permutation(x_train.shape[1])
+            else:
+                vec_ix = np.random.permutation(x_train.shape[0])
+            while True:
+                if not opt_local.use_rs_data:
+                    xs = x_train[vec_ix[ix], :].reshape(1, -1, 1)
+                else:
+                    xs_full = np.transpose(x_train[:, vec_ix[ix], :]).reshape(1, -1, 7)
+                    xs_ecg = xs_full[0, :, 0].reshape(1, -1, 1)
+                    xs_rs = xs_full[0, :, 1:].reshape(1, -1, 6)
+                    xs = [xs_ecg, xs_rs]
+                if not opt_local.multi_ch:
+                    ys = y_train[vec_ix[ix], :].reshape(1, -1, 1)
+                else:
+                    ys = np.transpose(y_train[:, vec_ix[ix], :]).reshape(1, -1, 63)
+                ix += 1
+                if not opt_local.use_rs_data:
+                    ix = ix % x_train.shape[0]
+                else:
+                    ix = ix % x_train.shape[1]
+                yield xs, ys
+
+        # Generator for the validation set, the output is a tuple of the xs and ys
+        def validation_generator():
+            ix = 0
+            if opt_local.use_rs_data:
+                vec_ix = np.random.permutation(x_validation.shape[1])
+            else:
+                vec_ix = np.random.permutation(x_validation.shape[0])
+            while True:
+                if not opt_local.use_rs_data:
+                    xs = x_validation[vec_ix[ix], :].reshape(1, -1, 1)
+                else:
+                    xs_full = np.transpose(x_validation[:, vec_ix[ix], :]).reshape(1, -1, 7)
+                    xs_ecg = xs_full[0, :, 0].reshape(1, -1, 1)
+                    xs_rs = xs_full[0, :, 1:].reshape(1, -1, 6)
+                    xs = [xs_ecg, xs_rs]
+                if not opt_local.multi_ch:
+                    ys = y_validation[vec_ix[ix], :].reshape(1, -1, 1)
+                else:
+                    ys = np.transpose(y_validation[:, vec_ix[ix], :]).reshape(1, -1, 63)
+                ix += 1
+                if not opt_local.use_rs_data:
+                    ix = ix % x_validation.shape[0]
+                else:
+                    ix = ix % x_validation.shape[1]
+                yield xs, ys
+
 
 
     # for each package of X, y, opt in d_features, let’s train and test!
@@ -84,16 +138,13 @@ def train(d_features, opt):
         # model = get_arch(arch, opt=opt_local)
 
 
-
-
-
-
-
+        arch = bcg_net_architecture.arch0001.create_arch(n_input, n_output, opt_local)
+        arch_name = bcg_net_architecture.arch0001.get_name()
 
         if f_arch.exists() and not overwrite:
             # print('Loading {}'.format(f_arch))
             with open(str(f_arch), 'rb') as handle:
-                net_settings = pickle.load(handle)
+                net_settings = dill.load(handle)
 
             weights = net_settings['weights']
 
@@ -114,11 +165,11 @@ def train(d_features, opt):
             if opt_local.epochs < 5:
                 print('Only {} epochs selected... testing?'.format(opt_local.epochs))
             if not opt_local.use_rs_data:
-                steps_per_epoch_train = x_ev_train.shape[0]
-                steps_per_epoch_validation = x_ev_validation.shape[0]
+                steps_per_epoch_train = x_train.shape[0]
+                steps_per_epoch_validation = x_validation.shape[0]
             else:
-                steps_per_epoch_train = x_ev_train.shape[1]
-                steps_per_epoch_validation = x_ev_validation.shape[1]
+                steps_per_epoch_train = x_train.shape[1]
+                steps_per_epoch_validation = x_validation.shape[1]
 
             if opt_local.validation is None:
                 model.fit_generator(train_generator(), steps_per_epoch=steps_per_epoch_train, epochs=opt_local.epochs, verbose=2)
@@ -160,7 +211,7 @@ def train(d_features, opt):
                 opt.f_arch = f_arch
 
             with open(str(f_arch), 'wb') as handle:
-                pickle.dump(net_settings, handle)
+                dill.dump(net_settings, handle)
 
             # Plotting the result of the training and saving the history file
             loss = m.history['loss']
@@ -176,7 +227,7 @@ def train(d_features, opt):
             fig.savefig(opt.p_arch / 'TrVa loss_TEp{}.svg'.format(epochs), format='svg')
 
             with open(opt.p_arch / 'history_rmse', 'wb') as filename:
-                pickle.dump(m.history, filename)
+                dill.dump(m.history, filename)
 
         return model, x_test, y_test, vec_ix_slice_test
 
@@ -189,6 +240,182 @@ def predict():
 
 def clean():
     return
+
+
+def train_sp(x_ev_train, x_ev_validation, y_ev_train, y_ev_validation, arch='gru_arch_000', overwrite=False, held_out=False, opt=None):
+    opt_local = defaults(opt)
+
+    if opt_local.f_arch is None:
+        str_arch = 'net_{}_{}.dat'.format(arch, datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+        dir_arch = opt_local.p_arch.joinpath(Path(str_arch.split('.')[0]))
+        dir_arch.mkdir(parents=True, exist_ok=True)
+        opt_local.p_arch = dir_arch
+        opt.f_arch = Path(str_arch)
+        f_arch = opt_local.p_arch.joinpath(opt.f_arch)
+
+    if isinstance(opt_local.f_arch, str):
+        str_arch = opt_local.f_arch.split('.')[0]
+        opt_local.p_arch = opt_local.p_arch.joinpath(str_arch)
+        f_arch = opt_local.p_arch.joinpath(Path(opt_local.f_arch))
+
+    model = get_arch(arch, opt=opt_local)
+
+    # Generator for the training set, the output is a tuple of the xs and ys
+    def train_generator():
+        ix = 0
+        if opt_local.use_rs_data:
+            vec_ix = np.random.permutation(x_ev_train.shape[1])
+        else:
+            vec_ix = np.random.permutation(x_ev_train.shape[0])
+        while True:
+            if not opt_local.use_rs_data:
+                xs = x_ev_train[vec_ix[ix], :].reshape(1, -1, 1)
+            else:
+                xs_full = np.transpose(x_ev_train[:, vec_ix[ix], :]).reshape(1, -1, 7)
+                xs_ecg = xs_full[0, :, 0].reshape(1, -1, 1)
+                xs_rs = xs_full[0, :, 1:].reshape(1, -1, 6)
+                xs = [xs_ecg, xs_rs]
+            if not opt_local.multi_ch:
+                ys = y_ev_train[vec_ix[ix], :].reshape(1, -1, 1)
+            else:
+                ys = np.transpose(y_ev_train[:, vec_ix[ix], :]).reshape(1, -1, 63)
+            ix += 1
+            if not opt_local.use_rs_data:
+                ix = ix % x_ev_train.shape[0]
+            else:
+                ix = ix % x_ev_train.shape[1]
+            yield xs, ys
+
+    # Generator for the validation set, the output is a tuple of the xs and ys
+    def validation_generator():
+        ix = 0
+        if opt_local.use_rs_data:
+            vec_ix = np.random.permutation(x_ev_validation.shape[1])
+        else:
+            vec_ix = np.random.permutation(x_ev_validation.shape[0])
+        while True:
+            if not opt_local.use_rs_data:
+                xs = x_ev_validation[vec_ix[ix], :].reshape(1, -1, 1)
+            else:
+                xs_full = np.transpose(x_ev_validation[:, vec_ix[ix], :]).reshape(1, -1, 7)
+                xs_ecg = xs_full[0, :, 0].reshape(1, -1, 1)
+                xs_rs = xs_full[0, :, 1:].reshape(1, -1, 6)
+                xs = [xs_ecg, xs_rs]
+            if not opt_local.multi_ch:
+                ys = y_ev_validation[vec_ix[ix], :].reshape(1, -1, 1)
+            else:
+                ys = np.transpose(y_ev_validation[:, vec_ix[ix], :]).reshape(1, -1, 63)
+            ix += 1
+            if not opt_local.use_rs_data:
+                ix = ix % x_ev_validation.shape[0]
+            else:
+                ix = ix % x_ev_validation.shape[1]
+            yield xs, ys
+
+    if f_arch.exists() and not overwrite:
+        # print('Loading {}'.format(f_arch))
+        with open(str(f_arch), 'rb') as handle:
+            net_settings = pickle.load(handle)
+
+        weights = net_settings['weights']
+
+        if held_out:
+            epochs_ori = net_settings['epochs']
+
+        if 'finished' in net_settings:
+            resume_overwrite = not (net_settings['finished'])
+        else:
+            resume_overwrite = False
+        resume = opt_local.resume or resume_overwrite
+
+        # you have to evaluate it before setting for some reason (maybe an older bug):
+        model.set_weights(weights=weights)
+    else:
+        resume = False
+
+    finished = True
+    if not (f_arch.exists()) or resume or overwrite:
+        print('Generating {}'.format(f_arch))
+        if opt_local.epochs < 5:
+            print('Only {} epochs selected... testing?'.format(opt_local.epochs))
+        if not opt_local.use_rs_data:
+            steps_per_epoch_train = x_ev_train.shape[0]
+            steps_per_epoch_validation = x_ev_validation.shape[0]
+        else:
+            steps_per_epoch_train = x_ev_train.shape[1]
+            steps_per_epoch_validation = x_ev_validation.shape[1]
+
+        if opt_local.validation is None:
+            model.fit_generator(train_generator(), steps_per_epoch=steps_per_epoch_train, epochs=opt_local.epochs,
+                                verbose=2)
+        else:
+            if opt_local.early_stopping:
+                # 'an absolute change of less than min_delta, will count as no improvement'
+                callbacks_ = [callbacks.EarlyStopping(monitor='val_loss', min_delta=opt_local.es_min_delta,
+                                                      patience=opt_local.es_patience, verbose=0, mode='min',
+                                                      restore_best_weights=True)]
+            else:
+                callbacks_ = None
+
+            m = model.fit_generator(train_generator(), steps_per_epoch=steps_per_epoch_train,
+                                    epochs=opt_local.epochs, verbose=2,
+                                    validation_data=validation_generator(),
+                                    validation_steps=steps_per_epoch_validation,
+                                    callbacks=callbacks_)
+
+            # net_settings['finished']
+            if np.max(m.epoch) + 1 >= opt_local.epochs:
+                finished = False
+
+        weights = model.get_weights()
+
+        if resume:
+            epochs = net_settings['epochs'] + len(m.history['loss'])  # don't like the structure here
+        else:
+            epochs = len(m.history['loss'])
+
+        net_settings = {'weights': weights, 'arch': arch, 'epochs': epochs, 'finished': finished}
+
+        # Don't like this code here
+        if not resume:
+            opt_local.p_arch.joinpath('TEp{}'.format(epochs)).mkdir(parents=True, exist_ok=True)
+            opt.p_arch = opt_local.p_arch.joinpath('TEp{}'.format(epochs))
+            opt.f_arch = f_arch
+        else:
+            if held_out:
+                epochs = epochs_ori
+            opt_local.p_arch.joinpath('TEp{}'.format(epochs)).mkdir(parents=True, exist_ok=True)
+            opt.p_arch = opt_local.p_arch.joinpath('TEp{}'.format(epochs))
+            opt.f_arch = f_arch
+
+        with open(str(f_arch), 'wb') as handle:
+            pickle.dump(net_settings, handle)
+
+        # Plotting the result of the training and saving the history file
+        loss = m.history['loss']
+        val_loss = m.history['val_loss']
+        vec_epochs = range(1, len(loss) + 1)
+        plt.figure(figsize=(6, 6))
+        plt.plot(vec_epochs, loss, 'bo', label='Training loss')
+        plt.plot(vec_epochs, val_loss, 'b', label='Validation loss')
+        plt.title('Training and validation loss')
+        plt.legend()
+
+        fig = plt.gcf()
+        if not held_out:
+            fig.savefig(opt.p_arch / 'TrVa_loss_TEp{}.svg'.format(epochs), format='svg')
+            with open(opt.p_arch / 'history_rmse', 'wb') as filename:
+                pickle.dump(m.history, filename)
+        else:
+            fig.savefig(opt.p_arch / 'TrVa_loss_ho_TEp{}.svg'.format(epochs), format='svg')
+            with open(opt.p_arch / 'history_rmse', 'rb') as handle:
+                h1 = pickle.load(handle)
+
+            h1['history_held_out_sub'] = m.history
+            with open(opt.p_arch / 'history_rmse', 'wb') as filename:
+                pickle.dump(h1, filename)
+
+        return model
 
 
 if __name__ == '__main__':
