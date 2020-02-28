@@ -56,15 +56,11 @@ def train(d_features, opt):
     data = data_dict['data']
     opt_local = data_dict['opt']
 
-    n_input, n_output = 64, 1
-    model = bcg_net_architecture.arch0001.create_arch\
-        (n_input, n_output, data_dict['opt'])
-
     f_arch = opt_local.d_features / 'arch_epoch_{}_fs_{}'.format(opt_local.t_epoch, opt_local.fs_ds)
-    overwrite = False
     opt_def = opt_default()
+    training_res = [None] * len(data)
 
-    for subj_data in data:
+    for i, subj_data in enumerate(data):
         x_train = subj_data['x_train']
         x_validation = subj_data['x_validation']
         x_test = subj_data['x_test']
@@ -95,13 +91,9 @@ def train(d_features, opt):
 
         # model = get_arch(arch, opt=opt_local)
 
-
-        arch = bcg_net_architecture.arch0001.create_arch(n_input, n_output, opt_local)
-        arch_name = bcg_net_architecture.arch0001.get_name()
-
-        res = train_sp(x_train, x_validation, y_train, y_validation,
-                       arch='gru_arch_general4', overwrite=False, held_out=False,
-                       opt=opt_def)
+        training_res[i] = train_sp(x_train, x_validation, y_train, y_validation,
+                       arch='gru_arch_general4', overwrite=False,
+                       held_out=False, opt=opt_def)
 
     return
 
