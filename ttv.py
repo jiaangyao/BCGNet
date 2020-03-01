@@ -56,19 +56,10 @@ def train(d_features, opt):
     data = data_dict['data']
     opt_local = data_dict['opt']
 
-    f_arch = opt_local.d_features / 'arch_epoch_{}_fs_{}'.format(opt_local.t_epoch, opt_local.fs_ds)
+    f_arch = opt_local.d_features / 'arch_epoch_{}_fs_{}'\
+        .format(opt_local.t_epoch, opt_local.fs_ds)
     opt_def = opt_default()
     training_res = [None] * len(data)
-
-    for i, subj_data in enumerate(data):
-        x_train = subj_data['x_train']
-        x_validation = subj_data['x_validation']
-        x_test = subj_data['x_test']
-        y_train = subj_data['y_train']
-        y_validation = subj_data['y_validation']
-        y_test = subj_data['y_test']
-        vec_ix_slice_test = subj_data['vec_ix_slice_test']
-
 
     # for each package of X, y, opt in d_features, let’s train and test!
     #     load train, test and validation features, also opt_feature_extract
@@ -91,11 +82,20 @@ def train(d_features, opt):
 
         # model = get_arch(arch, opt=opt_local)
 
+    for i, subj_data in enumerate(data):
+        x_train = subj_data['x_train']
+        x_validation = subj_data['x_validation']
+        x_test = subj_data['x_test']
+        y_train = subj_data['y_train']
+        y_validation = subj_data['y_validation']
+        y_test = subj_data['y_test']
+        vec_ix_slice_test = subj_data['vec_ix_slice_test']
+
         training_res[i] = train_sp(x_train, x_validation, y_train, y_validation,
                        arch='gru_arch_general4', overwrite=False,
                        held_out=False, opt=opt_def)
 
-    return
+    return training_res
 
 
 def predict():
