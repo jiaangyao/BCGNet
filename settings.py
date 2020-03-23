@@ -1,4 +1,7 @@
-# Directory structure
+"""
+Directory structure
+"""
+
 
 class GitLabel():
     def __init__(self):
@@ -19,13 +22,13 @@ class GitLabel():
     def tag(self):
         return self.label_.split('-')[0]
 
-    
+
 def init(_project_name, _d_root):
     global project_name
     project_name = _project_name  # user forced to specify
 
     global experiment_id
-    experiment_id = '' # something that identifies parameters of the
+    experiment_id = ''  # something that identifies parameters of the
     # experiment uniquely (e.g. which architecture? What features?)
 
     global d_root
@@ -45,7 +48,6 @@ def init(_project_name, _d_root):
     global d_features
     d_features = d_root / 'proc_bcgnet' / 'features' / '$experiment_id$'
     # feature_extractor.py output goes here
-    
+
     global git_label
     git_label = GitLabel()
-

@@ -18,10 +18,13 @@ Opt = namedtuple('Opt', ['input_feature', 'output_features',
 
 
 def opt_default():
-    # this is a function in feature_extractor.py with default settings
-    # not sure if there is a type in the channel settings in MNE, but if
-    # so that would be the easiest…:
+    """
+    This is a function in feature_extractor.py with default settings
+    not sure if there is a type in the channel settings in MNE, but if
+    so that would be the easiest…:
 
+    :return:
+    """
     return Opt(
         # if the feature_type opt are None, then you can specify manually,
         # e.g. opt.input_feature = [0, 1, 2] or, opt.input_feature =
@@ -43,21 +46,32 @@ def opt_default():
 
 
 def generate(d_mne, opt):
-    # point here is to convert a standardised MNE structure to an epoched X, Y
-    # for training, test and validate
+    """
+    Point here is to convert a standardised MNE structure to an epoched X, Y
+    for training, test and validate
+    Assert that of  [opt.output_features, opt.output_feature_type], exactly
+    one is none, do same for input
 
-    # Assert that of  [opt.output_features, opt.output_feature_type], exactly
-    # one is none, do same for input
+    :param d_mne:
+    :param opt:
+    :return:
+    """
     assert opt.p_training + opt.p_validation + opt.p_evaluation == 1
     d_features = opt.generate(d_mne, opt)  # so that we can easily switch it out
     return d_features
 
 
 def generate_ws_features(d_mne, opt):
-    # n.b. This is the code that generates features to train and test within
-    # subject… different functions would need to be defined for different
-    # required feature sets. I suggest we start with this one, then see how
-    # we go….
+    """
+    n.b. This is the code that generates features to train and test within
+    subject… different functions would need to be defined for different
+    required feature sets. I suggest we start with this one, then see how
+    we go….
+
+    :param d_mne:
+    :param opt:
+    :return:
+    """
     # d_mne = Path(opt.d_mne)
     d_features = Path(opt.d_features)
     h = ho.dict_to_hash(ho.namedtuple_to_dict(opt), exclusions=None)
@@ -170,6 +184,12 @@ def generate_ws_features(d_mne, opt):
 
 
 def get_index_range(i):
+    """
+    Get the continuous ranges of the index list.
+
+    :param i:A list containing the index values.
+    :return: A list of (start, end) tuples.
+    """
     for a, b in itertools.groupby(enumerate(i), lambda pair: pair[1] - pair[0]):
         b = list(b)
         yield b[0][1], b[-1][1]
@@ -177,8 +197,13 @@ def get_index_range(i):
 
 @contextlib.contextmanager
 def temp_seed(seed):
-    # see bcg_net.py for the use of this (it’s to recreate epoching with
-    # same seed)
+    """
+    See bcg_net.py for the use of this (it’s to recreate epoching with
+    same seed).
+
+    :param seed:
+    :return:
+    """
     state = np.random.get_state()
     np.random.seed(seed)
 
@@ -189,6 +214,12 @@ def temp_seed(seed):
 
 
 def generate_train_valid_test(epoched_data, opt=None):
+    """
+
+    :param epoched_data:
+    :param opt:
+    :return:
+    """
     opt_local = opt
     normalizedData = epoched_data.get_data()
     ecg_ch = epoched_data.info['ch_names'].index('ECG')
@@ -216,8 +247,14 @@ def generate_train_valid_test(epoched_data, opt=None):
     return x_ev_train, x_ev_validation, x_test, y_ev_train, y_ev_validation, y_test, vec_ix_slice_test
 
 
-# Split the epoched data into two parts using percentage as a cutoff
 def split_data(epoched_data, percentage):
+    """
+    Split the epoched data into two parts using percentage as a cutoff.
+
+    :param epoched_data:
+    :param percentage:
+    :return:
+    """
     vec_ix = np.random.permutation(len(epoched_data))
     vec_ix_cutoff = int(np.round(len(epoched_data) * percentage))
     vec_ix_first_part = vec_ix[:vec_ix_cutoff]
@@ -230,6 +267,13 @@ def split_data(epoched_data, percentage):
 
 
 def modify_motion_data_with_bcg(rs_set, opt, shift=None):
+    """
+
+    :param rs_set:
+    :param opt:
+    :param shift:
+    :return:
+    """
     opt_local = opt
     data = rs_set.get_data()
     info = rs_set.info
@@ -252,8 +296,14 @@ def modify_motion_data_with_bcg(rs_set, opt, shift=None):
 
     return modified_rs_raw
 
-# Normalizing the motion data
 def normalize_rs_data_multi_ch(rs_data, fs):
+    """
+    Normalizing the motion data.
+
+    :param rs_data:
+    :param fs:
+    :return:
+    """
     rs_info = mne.create_info(['t0', 't1', 't2', 'r0', 'r1', 'r2'], fs,
                               ['misc', 'misc', 'misc', 'misc', 'misc', 'misc'])
     transformational_data = rs_data[0:3, :]
@@ -270,8 +320,18 @@ def normalize_rs_data_multi_ch(rs_data, fs):
     return rs_renorm
 
 
-# Performing epoching on the raw data set that's provided
 def dataset_epoch(dataset, duration, epoch_rejection, threshold=None, raw_dataset=None, good_ix=None):
+    """
+    Performing epoching on the raw data set that's provided.
+
+    :param dataset:
+    :param duration:
+    :param epoch_rejection:
+    :param threshold:
+    :param raw_dataset:
+    :param good_ix:
+    :return:
+    """
     # Constructing events of duration 10s
     info = dataset.info
     fs = info['sfreq']
@@ -302,25 +362,48 @@ def dataset_epoch(dataset, duration, epoch_rejection, threshold=None, raw_datase
 
 
 def data_epoch(data, t):
-    # mne based epoching
+    """
+    MNE based epoching.
+
+    :param data:
+    :param t:
+    :return:
+    """
     return mne.Epochs(data, t, tmin=0, tmax=3)
 
 
 def data_normalize(data):
+    """
 
+    :param data:
+    :return:
+    """
     return data
 
 
 def data_resample(data, fs_ds):
-    # see bcg_net.py
-    # although I am not sure if we want this here! Maybe it should be in
-    # feature_extraction
+    """
+    See bcg_net.py
+    although I am not sure if we want this here! Maybe it should be in
+    feature_extraction
+
+    :param data:
+    :param fs_ds:
+    :return:
+    """
     data.resample(fs_ds)
     return data
 
 
-# Normalize the data by subtracting the mean and then dividing it by its std for multiple channels
 def normalize_raw_data_multi_ch(raw_data, target_ch=[]):
+    """
+    Normalize the data by subtracting the mean and then dividing it by its std
+    for multiple channels
+
+    :param raw_data:
+    :param target_ch:
+    :return:
+    """
     # Assuming that raw data is an mne Raw object
     data = raw_data.get_data()
     info = raw_data.info

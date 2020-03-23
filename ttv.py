@@ -20,7 +20,11 @@ Opt = namedtuple('Opt', ['input_feature', 'output_features',
 
 
 def opt_default():
-    # this is a function in ttv.py with default settings
+    """
+    This is a function in ttv.py with default settings.
+
+    :return:
+    """
     Opt = namedtuple('Opt', ['epochs', 'es_min_delta', 'es_patience',
                              'early_stopping', 'resume', 'overwrite',
                              'validation', 'ttv_split', 'debug_mode',
@@ -42,13 +46,18 @@ def opt_default():
 
 
 def train(d_features, opt):
-    # See bcg_net.py for inspiration.  The extra thing to consider is that
-    # it would be nice to be able to switch between CNN and RNN which require
-    # fundamentally different data restructuring {- maybe - this could go in
-    # the architecture but probably there is some reason I have not thought
-    # about it, for why this doesn’t work }. I have example code for this,
-    # but may not be in bcg_net.
+    """
+    See bcg_net.py for inspiration.  The extra thing to consider is that
+    it would be nice to be able to switch between CNN and RNN which require
+    fundamentally different data restructuring {- maybe - this could go in
+    the architecture but probably there is some reason I have not thought
+    about it, for why this doesn’t work }. I have example code for this,
+    but may not be in bcg_net.
 
+    :param d_features:
+    :param opt:
+    :return:
+    """
     file = open(d_features, 'rb')
     data_dict = dill.load(file)
     file.close()
@@ -99,15 +108,35 @@ def train(d_features, opt):
 
 
 def predict():
+    """
+
+    :return:
+    """
     return
 
 
 def clean():
+    """
+
+    :return:
+    """
     return
 
 
 def train_sp(x_ev_train, x_ev_validation, y_ev_train, y_ev_validation,
              arch='gru_arch_000', overwrite=False, held_out=False, opt=None):
+    """
+
+    :param x_ev_train:
+    :param x_ev_validation:
+    :param y_ev_train:
+    :param y_ev_validation:
+    :param arch:
+    :param overwrite:
+    :param held_out:
+    :param opt:
+    :return:
+    """
     opt_local = opt
 
     # if opt_local.f_arch is None:

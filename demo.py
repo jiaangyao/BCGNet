@@ -1,5 +1,8 @@
-# demo.py - the custom script a user modifies (highest level). I guess we also want a non-python interface version of this using argparse. Take a look at cluster/cluster_functions.py for an example of how to do this.
-
+"""
+demo.py - the custom script a user modifies (highest level). I guess we also want
+a non-python interface version of this using argparse. Take a look at
+cluster/cluster_functions.py for an example of how to do this.
+"""
 import bcg_net
 import data_loader
 import feature_extractor

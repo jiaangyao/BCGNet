@@ -11,7 +11,6 @@ def set_seed(ps):
     :type ps: str
     :param ps: any string to be hashed
     """
-
     hash_ = gen_hash(ps)
     random.seed(hash_)
     np.random.seed(hash_)  # not tested
@@ -24,7 +23,6 @@ def gen_hash(ps):
     :type ps: str
     :param ps: any string to be hashed
     """
-
     str_hash = str(ps)
     hash_object = hashlib.md5(str_hash.encode('utf-8'))
     hash = int(hash_object.hexdigest(), 16) % 2 ** 32
@@ -32,7 +30,14 @@ def gen_hash(ps):
 
 
 def namedtuple_to_dict(opt, exclusions=None, **kwargs):
-    """Generate a dictionary of items to be hashed"""
+    """
+    Generate a dictionary of items to be hashed.
+
+    :param opt:
+    :param exclusions:
+    :param kwargs:
+    :return:
+    """
     default_exclusions = ['overwrite', 'plot']
     if exclusions:
         exclusions = default_exclusions.append(exclusions)
@@ -54,11 +59,22 @@ def namedtuple_to_dict(opt, exclusions=None, **kwargs):
 
 
 def dict_to_hash(dict, exclusions=None):
+    """
+
+    :param dict:
+    :param exclusions:
+    :return:
+    """
     ip_string = dict_to_string(dict)
     return gen_hash(ip_string)
 
 
 def dict_to_string(hashable_dict):
+    """
+
+    :param hashable_dict:
+    :return:
+    """
     ip_string = ''
     for k, v in hashable_dict.items():
         ip_string = ip_string + k

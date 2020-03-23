@@ -4,17 +4,31 @@ from tensorflow.python.keras import layers, callbacks, regularizers, optimizers
 from tensorflow.python.keras import backend as K
 import os
 
-# called with bcg_net_architecture.gru_arch_general4.create_arch(blah)
+"""
+Called with bcg_net_architecture.gru_arch_general4.create_arch(blah)
+"""
 
 def get_name():
+    """
+    Get the name of the arch.
+
+    :return: The name of the arch.
+    """
     filename = os.path.basename(__file__)
     return os.path.splitext(filename)[0]
 
 
 def create_arch(n_input, n_output, opt_feature_extract):
-    # we pass opt because some arch are incompatible with some feature
-    # extractions… so we need to do an error check for compat sometimes.
-    # Multi-run, no motion, simple
+    """
+    We pass opt because some arch are incompatible with some feature
+    extractions… so we need to do an error check for compat sometimes.
+    Multi-run, no motion, simple
+
+    :param n_input:
+    :param n_output:
+    :param opt_feature_extract:
+    :return:
+    """
     session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
     sess = tf.Session(config=session_config)
 
