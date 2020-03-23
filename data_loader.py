@@ -37,7 +37,7 @@ def convert_to_mne(d_input, d_output, opt):
 
     for sub in d_input.iterdir():
         for run in (d_input / sub).iterdir():
-            if run.suffix == '.set' and not 'all' in run.stem \
+            if run.suffix == '.set' and 'all' not in run.stem \
                     and run.stat().st_size > 0:
                 out_dir = d_output / sub.stem
                 out_dir.mkdir(parents=True, exist_ok=True)
