@@ -20,13 +20,13 @@ def opt_default():
     Opt = namedtuple('Opt', ['load_type', 'd_mne', 'run_regex', 'overwrite'])
 
     return Opt(
-        load_type = load_eeglab,  # function handle to the function that we
+        load_type=load_eeglab,  # function handle to the function that we
         # want to use to load the actual data. To make it easily extensible.
-        d_mne = 'mne', # settings.d_root / 'proc_bcgnet/mne/',  # if I was writing
+        d_mne='mne',  # settings.d_root / 'proc_bcgnet/mne/',  # if I was writing
         # this myself, I would use environment variables to specify d_root,
         # maybe there are opinions on this...
-        run_regex = '?', # capture subject name, session and run
-        overwrite = False
+        run_regex='?',  # capture subject name, session and run
+        overwrite=False
     )
 
 
@@ -37,7 +37,7 @@ def convert_to_mne(d_input, d_output, opt):
 
     for sub in d_input.iterdir():
         for run in (d_input / sub).iterdir():
-            if run.suffix == '.set' and not 'all' in run.stem\
+            if run.suffix == '.set' and not 'all' in run.stem \
                     and run.stat().st_size > 0:
                 out_dir = d_output / sub.stem
                 out_dir.mkdir(parents=True, exist_ok=True)
@@ -62,7 +62,7 @@ def load_eeglab(f_input):  # see opt.load_type
     # make sure that channel names are OK and channel types (e.g. they have ‘eeg’ or ‘ecg’ type)
     return data
 
-  
+
 if __name__ == '__main__':
     """ used for debugging """
     d_ga_removed = Path('/home/yida/Local/working_eegbcg/proc_full/proc_rs/')
