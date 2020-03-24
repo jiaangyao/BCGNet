@@ -10,7 +10,6 @@ import mne.io
 import itertools
 import dill
 
-
 Opt = namedtuple('Opt', ['input_feature', 'output_features',
                          'd_features', 't_epoch', 'generate',
                          'fs_ds', 'p_training', 'p_validation',
@@ -31,17 +30,17 @@ def opt_default():
         # [‘Fz’, ‘Cz’] etc.
         input_feature=['ecg'],
         output_features=['eeg'],
-        d_features = settings.d_root / 'Local/working_eegbcg/proc_bcgnet/features/',
-        t_epoch = 2,
-        generate = generate_ws_features,  # train and test within subject.
+        d_features=settings.d_root / 'Local/working_eegbcg/proc_bcgnet/features/',
+        t_epoch=2,
+        generate=generate_ws_features,  # train and test within subject.
         # To test across subject, or test within run we define new functions
         # here some extensions might fit neatly within generate_ws_features,
         # for some we might need entirely new functions specified here.
-        fs_ds = 100, # frequency at which to downsample (this gets inverted
+        fs_ds=100,  # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
-        p_training = 0,
-        p_validation = 0.15,
-        p_evaluation = 0.85
+        p_training=0,
+        p_validation=0.15,
+        p_evaluation=0.85
     )
 
 
@@ -146,7 +145,7 @@ def generate_ws_features(d_mne, opt):
                 if j == 0:
                     epoched_data_combined = vec_epoched_data[j]
                 else:
-                    epoched_data_combined = mne.concatenate_epochs\
+                    epoched_data_combined = mne.concatenate_epochs \
                         ([epoched_data_combined, vec_epoched_data[j]])
 
             x_train, x_validation, x_test, y_train, y_validation, \
@@ -233,7 +232,7 @@ def generate_train_valid_test(epoched_data, opt=None):
         if opt_local.p_validation is not None:
             s_ev, s_test, _, vec_ix_slice_test = split_data(normalizedData, opt_local.p_evaluation)
             ev_epoch_num = int(np.round(num_epochs * opt_local.p_evaluation))
-            per_validation = int(np.round(opt_local.p_validation * num_epochs))/ev_epoch_num
+            per_validation = int(np.round(opt_local.p_validation * num_epochs)) / ev_epoch_num
             s_ev_va, s_ev_train, _, _ = split_data(s_ev, per_validation)
 
             x_ev_train = np.transpose(s_ev_train[:, np.insert(rs_ch, 0, ecg_ch), :], axes=(1, 0, 2))
@@ -296,6 +295,7 @@ def modify_motion_data_with_bcg(rs_set, opt, shift=None):
 
     return modified_rs_raw
 
+
 def normalize_rs_data_multi_ch(rs_data, fs):
     """
     Normalizing the motion data.
@@ -337,13 +337,13 @@ def dataset_epoch(dataset, duration, epoch_rejection, threshold=None, raw_datase
     fs = info['sfreq']
 
     total_time_stamps = dataset.get_data().shape[1]
-    constructed_events = np.zeros(shape=(int(np.floor(total_time_stamps/fs)/duration), 3), dtype=int)
+    constructed_events = np.zeros(shape=(int(np.floor(total_time_stamps / fs) / duration), 3), dtype=int)
 
-    for i in range(0, int(np.floor(total_time_stamps/fs))-duration, duration):
-        ix = i/duration
-        constructed_events[int(ix)] = np.array([i*fs, 0, 1])
+    for i in range(0, int(np.floor(total_time_stamps / fs)) - duration, duration):
+        ix = i / duration
+        constructed_events[int(ix)] = np.array([i * fs, 0, 1])
 
-    tmax = duration - 1/fs
+    tmax = duration - 1 / fs
 
     # Epoching the data using the constructed event and plotting it
     old_epoched_data = mne.Epochs(dataset, constructed_events, tmin=0, tmax=tmax)
@@ -437,5 +437,3 @@ if __name__ == '__main__':
 
     settings.init(Path.home(), Path.home())  # Call only once
     generate_ws_features(None, opt_default())
-
-

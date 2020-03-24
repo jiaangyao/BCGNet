@@ -12,7 +12,6 @@ import matplotlib as plt
 import datetime
 from pathlib import Path
 
-
 Opt = namedtuple('Opt', ['input_feature', 'output_features',
                          'd_features', 't_epoch', 'generate',
                          'fs_ds', 'p_training', 'p_validation',
@@ -31,17 +30,17 @@ def opt_default():
                              'arch', 'extra_string'])
 
     return Opt(
-        epochs = 2500,
-        es_min_delta = 1e-5,
-        es_patience = 25,  # How many times does the validation not increase
-        early_stopping = True,
-        resume = True,
-        overwrite = False,
-        validation = None,
-        ttv_split = [0.7, 0.2, 0.1],  # train/test/validate split
-        debug_mode = False,  # more output, also plots
-        arch = bcg_net_architecture.arch0001,
-        extra_string = ''
+        epochs=2500,
+        es_min_delta=1e-5,
+        es_patience=25,  # How many times does the validation not increase
+        early_stopping=True,
+        resume=True,
+        overwrite=False,
+        validation=None,
+        ttv_split=[0.7, 0.2, 0.1],  # train/test/validate split
+        debug_mode=False,  # more output, also plots
+        arch=bcg_net_architecture.arch0001,
+        extra_string=''
     )
 
 
@@ -65,7 +64,7 @@ def train(d_features, opt):
     data = data_dict['data']
     opt_local = data_dict['opt']
 
-    f_arch = opt_local.d_features / 'arch_epoch_{}_fs_{}'\
+    f_arch = opt_local.d_features / 'arch_epoch_{}_fs_{}' \
         .format(opt_local.t_epoch, opt_local.fs_ds)
     opt_def = opt_default()
     training_res = [None] * len(data)
@@ -84,12 +83,11 @@ def train(d_features, opt):
     #
     # return
 
+    # if f_arch exists, we load it, if it is finished training that’s it
+    # if it hasn’t finished training, we finish training
+    # if it doesn’t exist we start training
 
-        # if f_arch exists, we load it, if it is finished training that’s it
-        # if it hasn’t finished training, we finish training
-        # if it doesn’t exist we start training
-
-        # model = get_arch(arch, opt=opt_local)
+    # model = get_arch(arch, opt=opt_local)
 
     for i, subj_data in enumerate(data):
         x_train = subj_data['x_train']
@@ -101,8 +99,8 @@ def train(d_features, opt):
         vec_ix_slice_test = subj_data['vec_ix_slice_test']
 
         training_res[i] = train_sp(x_train, x_validation, y_train, y_validation,
-                       arch='gru_arch_general4', overwrite=False,
-                       held_out=False, opt=opt_def)
+                                   arch='gru_arch_general4', overwrite=False,
+                                   held_out=False, opt=opt_def)
 
     return training_res
 
@@ -192,8 +190,7 @@ def train_sp(x_ev_train, x_ev_validation, y_ev_train, y_ev_validation,
         # if opt_local.use_rs_data:
         vec_ix = np.random.permutation(x_ev_validation.shape[1])
         # else:
-            # vec_ix = np.random.permutation(x_ev_validation.shape[0])
-
+        # vec_ix = np.random.permutation(x_ev_validation.shape[0])
 
         while True:
             # if not opt_local.use_rs_data:
@@ -327,4 +324,3 @@ if __name__ == '__main__':
     """ used for debugging """
     d_features = '/home/yida/Local/working_eegbcg/proc_bcgnet/features/features.obj'
     train(d_features, None)
-

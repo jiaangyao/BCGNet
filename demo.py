@@ -10,7 +10,6 @@ import ttv
 import settings
 from pathlib import Path
 
-
 settings.init(Path.home(), Path.home())  # Call only once
 
 opt_data_loader = data_loader.opt_default()
@@ -28,7 +27,3 @@ bcg = ttv.predict(d_features, d_model, opt_ttv)  # evaluate the model on all dat
 eeg = ttv.clean(d_features, d_model, d_mne, opt_ttv)  # upsample bcg back to eeg sampling rate and subtract
 
 # then we can write some helper stuff to do something with the output
-
-
-
-

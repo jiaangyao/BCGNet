@@ -7,6 +7,7 @@ import os
 Called with bcg_net_architecture.gru_arch_001.create_arch(blah)
 """
 
+
 def get_name():
     """
     Get the name of the arch.
@@ -42,4 +43,3 @@ def create_arch(n_input, n_output, opt_feature_extract):
 
 if __name__ == '__main__':
     """ used for debugging """
-
