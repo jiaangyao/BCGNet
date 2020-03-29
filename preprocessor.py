@@ -1,7 +1,9 @@
 import scipy.stats as stats
-from sp.sp_normalization import *
+from sp_normalization import *
 from utils.context_management import suppress_stdout
 from set_env_linbi import rs_path
+import numpy as np
+import mne
 
 
 def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_motion_data):
@@ -296,3 +298,106 @@ def mad_rejection(dataset, threshold, fs, duration):
     vec_bad_epochs_ix = np.arange(0, len(vec_eeg_norm), 1)[vec_eeg_norm > threshold]
 
     return vec_bad_epochs_ix
+
+
+def normalize_raw_data(raw_dataset):
+    """
+    Performs renormalization of the raw dataset by whitening each channel (subtracting the mean of each channel and
+    then divide by the standard deviation (std) of each channel
+
+    :param raw_dataset: MNE Raw Object that contains the unnormalized raw data
+
+    :return: normalized_raw
+    :return: ecg_stats
+    :return: eeg_stats
+    """
+
+    # Obtain the data numpy array and information structure from the MNE Raw object
+    data = raw_dataset.get_data()
+    info = raw_dataset.info
+
+    # Obtain the number of the channel that holds the ECG channel and the channel index
+    ecg_ch = info['ch_names'].index('ECG')
+    target_ch = np.delete(np.arange(0, len(info['ch_names']), 1), ecg_ch)
+
+    # used for reverting back to original data later
+    ecg_mean = np.mean(data[ecg_ch, :])
+    ecg_std = np.std(data[ecg_ch, :])
+    eeg_mean = np.mean(data[target_ch, :], axis=1)
+    eeg_std = np.std(data[target_ch, :], axis=1)
+
+    normalized_data = np.zeros(data.shape)
+    for i in range(data.shape[0]):
+        ds = data[i, :] - np.mean(data[i, :])
+        ds /= np.std(ds)
+        normalized_data[i, :] = ds
+
+    normalized_raw = mne.io.RawArray(normalized_data, info)
+
+    ecg_stats = [ecg_mean, ecg_std]
+    eeg_stats = [eeg_mean, eeg_std]
+
+    return normalized_raw, ecg_stats, eeg_stats
+
+
+def renormalize(data, stats, flag_multi_ch, flag_time_series):
+    """
+    Performs renormalization operations that undo the whitening of the data in the proprocessing steps
+    In particular, data is renormalized by via the formula (channel of data) * (channel std) + (channel mean)
+
+    :param data: input numpy array that can be (either in the form of (epoch, data) in the case of ECG input or in the
+        form of (channel, epoch, data) in the case of EEG input) for epoched data, or (can be in the form of (data,) in
+        the case of ECG input or in the form of (channel, data) in the case of EEG input) in the case of time series
+        input
+    :param stats: input list either in the form of [ecg_mean, ecg_std] or in the form of
+        [[eeg_ch1_mean, eeg_ch2_mean, ...], [eeg_ch1_std, eeg_ch2_std, ...]]
+    :param flag_multi_ch: input boolean variable that specifies if input is ECG or EEG (0 for ECG, 1 for EEG)
+    :param flag_time_series: input boolean variable that specifies if input is in the form of epochs (epoch, [channel],
+        data) or in the form of time series ([channel], data) (0 for epoched data, 1 for time series)
+
+    :return: data_renorm: renormalized data either in the form (epoch, data) or (epoch, channel, data)
+    """
+
+    # If the data is in the form of time series
+    if flag_time_series:
+        if not flag_multi_ch:
+            # If the input is ECG, then renormalization can be simply done by multiplying data by std (stats[0])
+            # and then add by mean (stats[1])
+            data_renorm = data*stats[1] + stats[0]
+
+        else:
+            # If the input is EEG, then first create an empty array of the same shape as the input and then perform
+            # normalization channel by channel
+
+            # Create empty array same size as input
+            data_renorm = np.zeros(data.shape)
+
+            # Loop through the channels of the input
+            for i in range(data.shape[0]):
+                # For each channel, perform the renormalization
+                data_renorm[i, :] = data[i, :] * stats[1][i] + stats[0][i]
+
+    # If the data is in the form of epoched data
+    else:
+        if not flag_multi_ch:
+            # If the input is ECG, then renormalization can be simply done by multiplying data by std (stats[0])
+            # and then add by mean (stats[1])
+            data_renorm = data*stats[1] + stats[0]
+
+        else:
+            # If the input is EEG, then first create an empty array of the same shape as the input and then perform
+            # normalization channel by channel
+
+            # Create empty array same size as input
+            data_renorm = np.zeros(data.shape)
+
+            # Loop through the channels of the input
+            for i in range(data.shape[0]):
+                # For each channel, perform the renormalization
+                data_renorm[i, :, :] = data[i, :, :] * stats[1][i] + stats[0][i]
+
+    return data_renorm
+
+
+if __name__ == '__main__':
+    """ used for debugging """
