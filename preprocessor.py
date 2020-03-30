@@ -1,9 +1,45 @@
 import scipy.stats as stats
 from sp_normalization import *
+from collections import namedtuple
 from utils.context_management import suppress_stdout
-from set_env_linbi import rs_path
+from settings import rs_path, obs_path
 import numpy as np
 import mne
+import settings
+from options import test_opt
+
+Opt = namedtuple('Opt', ['input_feature', 'output_features',
+                         'd_features', 't_epoch', 'generate',
+                         'fs_ds', 'p_training', 'p_validation',
+                         'p_evaluation'])
+
+
+def opt_default():
+    """
+    This is a function in feature_extractor.py with default settings
+    not sure if there is a type in the channel settings in MNE, but if
+    so that would be the easiest…:
+
+    :return:
+    """
+    return Opt(
+        # if the feature_type opt are None, then you can specify manually,
+        # e.g. opt.input_feature = [0, 1, 2] or, opt.input_feature =
+        # [‘Fz’, ‘Cz’] etc.
+        input_feature=['ecg'],
+        output_features=['eeg'],
+        d_features=settings.d_root / 'Local/working_eegbcg/proc_bcgnet/features/',
+        t_epoch=2,
+        # generate=generate_ws_features,  # train and test within subject.
+        # To test across subject, or test within run we define new functions
+        # here some extensions might fit neatly within generate_ws_features,
+        # for some we might need entirely new functions specified here.
+        fs_ds=100,  # frequency at which to downsample (this gets inverted
+        # at the end of the pipeline)
+        p_training=0,
+        p_validation=0.15,
+        p_evaluation=0.85
+    )
 
 
 def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_motion_data):
@@ -72,7 +108,7 @@ def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_mot
                                                 good_idx=good_idx)
 
     return normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, raw_dataset, \
-        orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, good_idx
+           orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, good_idx
 
 
 def preprocessing_mr(str_sub, vec_run_id, duration, threshold, n_downsampling, flag_use_motion_data):
@@ -126,11 +162,11 @@ def preprocessing_mr(str_sub, vec_run_id, duration, threshold, n_downsampling, f
 
         # Load, normalize and epoch the raw dataset
         normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, raw_dataset, \
-            orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
-            ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs, duration=duration,
-                                                           threshold=threshold,
-                                                           n_downsampling=n_downsampling,
-                                                           flag_use_motion_data=flag_use_motion_data)
+        orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
+        ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs, duration=duration,
+                                                       threshold=threshold,
+                                                       n_downsampling=n_downsampling,
+                                                       flag_use_motion_data=flag_use_motion_data)
 
         vec_normalized_epoched_raw_dataset.append(normalized_epoched_raw_dataset)
         vec_normalized_raw_dataset.append(normalized_raw_dataset)
@@ -142,8 +178,8 @@ def preprocessing_mr(str_sub, vec_run_id, duration, threshold, n_downsampling, f
         vec_eeg_stats.append(eeg_stats)
         vec_good_idx.append(good_idx)
 
-    return vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, vec_raw_dataset,\
-        vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, vec_ecg_stats, vec_eeg_stats, vec_good_idx
+    return vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, vec_raw_dataset, \
+           vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, vec_ecg_stats, vec_eeg_stats, vec_good_idx
 
 
 def dataset_epoch(dataset, duration, epoch_rejection, threshold=None, raw_dataset=None, good_idx=None):
@@ -363,7 +399,7 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
         if not flag_multi_ch:
             # If the input is ECG, then renormalization can be simply done by multiplying data by std (stats[0])
             # and then add by mean (stats[1])
-            data_renorm = data*stats[1] + stats[0]
+            data_renorm = data * stats[1] + stats[0]
 
         else:
             # If the input is EEG, then first create an empty array of the same shape as the input and then perform
@@ -382,7 +418,7 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
         if not flag_multi_ch:
             # If the input is ECG, then renormalization can be simply done by multiplying data by std (stats[0])
             # and then add by mean (stats[1])
-            data_renorm = data*stats[1] + stats[0]
+            data_renorm = data * stats[1] + stats[0]
 
         else:
             # If the input is EEG, then first create an empty array of the same shape as the input and then perform
@@ -401,3 +437,27 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
 
 if __name__ == '__main__':
     """ used for debugging """
+    from pathlib import Path
+    settings.init(Path.home(), Path.home())  # Call only once
+    str_sub = 'sub11'
+    run_id = 1
+    opt_user = test_opt(None)
+
+    # Path setup
+    p_rs, f_rs = rs_path(str_sub, run_id)
+    p_obs, f_obs = obs_path(str_sub, run_id)
+
+    pfe_rs = str(p_rs / f_rs)
+    pfe_obs = str(p_obs / f_obs)
+
+    """
+    Preparing the dataset
+    """
+    # Load, normalize and epoch the raw dataset
+    normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset,\
+    raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
+    ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs,
+                                                   duration=opt_user.epoch_duration,
+                                                   threshold=opt_user.mad_threshold,
+                                                   n_downsampling=opt_user.n_downsampling,
+                                                   flag_use_motion_data=opt_user.use_motion_data)
