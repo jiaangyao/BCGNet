@@ -435,14 +435,14 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
     return data_renorm
 
 
-if __name__ == '__main__':
-    """ used for debugging """
-    from pathlib import Path
-    settings.init(Path.home(), Path.home())  # Call only once
-    str_sub = 'sub11'
-    run_id = 1
-    opt_user = test_opt(None)
+def __test_preprocessing_sssr__(str_sub='sub11', run_id=1, opt_user=test_opt(None)):
+    """
+    Test preprocessing on single subject, single run.
 
+    :param str_sub: name of the subject in the form subXX
+    :param run_id: index of the run, in the form X
+    :param opt_user: an opt object
+    """
     # Path setup
     p_rs, f_rs = rs_path(str_sub, run_id)
     p_obs, f_obs = obs_path(str_sub, run_id)
@@ -454,10 +454,47 @@ if __name__ == '__main__':
     Preparing the dataset
     """
     # Load, normalize and epoch the raw dataset
-    normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset,\
+    normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
     raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
     ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs,
                                                    duration=opt_user.epoch_duration,
                                                    threshold=opt_user.mad_threshold,
                                                    n_downsampling=opt_user.n_downsampling,
                                                    flag_use_motion_data=opt_user.use_motion_data)
+
+
+def __test_preprocessing_ssmr__(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
+                                str_arch='gru_arch_general4', opt_user=test_opt(None)):
+    """
+    Test preprocessing on single subject, multiple run.
+
+    :param str_sub: name of the subject in the form subXX
+    :param vec_run_id: list containing indices of the run, in the form [X1, X2, X3, ...]
+    :param str_arch: name of the architecture to run
+    :param opt_user: an opt object
+    """
+
+    # print('Process starting')
+    # starttime = datetime.datetime.now()
+    # print("The start time is {}\n\n".format(starttime.strftime("%Y/%m/%d %H:%M:%S")))
+
+    """
+    Preparing the dataset
+    """
+    # Load, normalize and epoch the raw dataset from all runs
+    vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, \
+    vec_raw_dataset, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, vec_ecg_stats, \
+    vec_eeg_stats, vec_good_idx = preprocessing_mr(str_sub=str_sub,
+                                                   vec_run_id=vec_run_id,
+                                                   duration=opt_user.epoch_duration,
+                                                   threshold=opt_user.mad_threshold,
+                                                   n_downsampling=opt_user.n_downsampling,
+                                                   flag_use_motion_data=opt_user.use_motion_data)
+
+
+if __name__ == '__main__':
+    """ used for debugging """
+    from pathlib import Path
+    settings.init(Path.home(), Path.home())  # Call only once
+    __test_preprocessing_sssr__('sub11', 1, test_opt(None))
+    __test_preprocessing_ssmr__('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))
