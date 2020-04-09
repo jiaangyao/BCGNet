@@ -1,6 +1,10 @@
 import numpy as np
 import mne
+
+from options import test_opt
+from preprocessor import _test_preprocessing_sssr_, _test_preprocessing_ssmr_
 from utils.context_management import temp_seed
+import settings
 
 
 def generate_train_valid_test(epoched_dataset, opt=None):
@@ -45,7 +49,7 @@ def generate_train_valid_test(epoched_dataset, opt=None):
 
         # Recalculate the percentage of validation epochs in the evaluation set so that the final outcome is
         # num_epochs * opt.validation
-        per_validation = int(np.round(opt.validation * num_epochs))/ev_epoch_num
+        per_validation = int(np.round(opt.validation * num_epochs)) / ev_epoch_num
 
         # Generate the training and validation sets
         s_train, s_val, vec_ix_slice_train, vec_ix_slice_val = split_train_validation(s_ev, per_validation)
@@ -161,7 +165,7 @@ def generate_train_valid_test_cv(epoched_dataset, opt=None):
     with temp_seed(1997):
         # Split everything into int(ceil(1/per_fold)) number of folds of roughly equal sizes
         permuted_vec_ix_epoch = np.random.permutation(num_epochs)
-        num_fold = int(np.ceil(1/opt.per_fold))
+        num_fold = int(np.ceil(1 / opt.per_fold))
         mat_ix_slice_test = np.array_split(permuted_vec_ix_epoch, num_fold)
 
         # Define the empty arrays to hold the variables
@@ -216,7 +220,7 @@ def generate_train_valid_test_cv(epoched_dataset, opt=None):
 def generate_train_valid_test_cv_mr(vec_epoched_dataset, vec_run_id, opt=None):
     """
     Wrapper function using the generate_train_valid_test function to combine multiple epoched datasets first and then
-    split the combined epoched dataset into training, validation and test sets in a CV manner
+    split the combined epoched dataset into training, validation and test sets in a cross validation manner
 
     :param vec_epoched_dataset: list containing mne.EpochArray objects where each object contains epoched data
         from a single run
@@ -443,3 +447,26 @@ def gen_batches_rnn(data_list, flag_input):
             batch_list.append(batches)
 
     return batch_list
+
+
+def _test_generate_train_valid_test_(str_sub='sub11', run_id=1, opt_user=test_opt(None)):
+    normalized_epoched_raw_dataset = _test_preprocessing_sssr_(str_sub, run_id, opt_user)
+    generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt_user)
+
+
+def _test_generate_train_valid_test_mr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
+                              str_arch='gru_arch_general4', opt_user=test_opt(None)):
+    vec_normalized_epoched_raw_dataset = _test_preprocessing_ssmr_(str_sub, vec_run_id, str_arch, opt_user)
+
+    # Split the epoched dataset into training, validation and test sets
+    mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice = \
+        generate_train_valid_test_mr(vec_normalized_epoched_raw_dataset, vec_run_id, opt=opt_user)
+
+
+if __name__ == '__main__':
+    """ used for debugging """
+    from pathlib import Path
+
+    settings.init(Path.home(), Path.home())  # Call only once
+    _test_generate_train_valid_test_('sub11', 1, test_opt(None))
+    _test_generate_train_valid_test_mr_('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))

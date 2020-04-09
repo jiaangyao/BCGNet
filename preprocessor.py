@@ -1,11 +1,11 @@
 import scipy.stats as stats
-from sp_normalization import *
 from collections import namedtuple
 from utils.context_management import suppress_stdout
 from settings import rs_path, obs_path
 import numpy as np
 import mne
 import settings
+from datetime import datetime
 from options import test_opt
 
 Opt = namedtuple('Opt', ['input_feature', 'output_features',
@@ -36,9 +36,9 @@ def opt_default():
         # for some we might need entirely new functions specified here.
         fs_ds=100,  # frequency at which to downsample (this gets inverted
         # at the end of the pipeline)
-        p_training=0,
+        p_training=0.15,
         p_validation=0.15,
-        p_evaluation=0.85
+        p_evaluation=0.7
     )
 
 
@@ -435,13 +435,14 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
     return data_renorm
 
 
-def __test_preprocessing_sssr__(str_sub='sub11', run_id=1, opt_user=test_opt(None)):
+def _test_preprocessing_sssr_(str_sub='sub11', run_id=1, opt_user=test_opt(None)):
     """
     Test preprocessing on single subject, single run.
 
     :param str_sub: name of the subject in the form subXX
     :param run_id: index of the run, in the form X
     :param opt_user: an opt object
+    :return normalized_epoched_raw_dataset: preprocessed dataset
     """
     # Path setup
     p_rs, f_rs = rs_path(str_sub, run_id)
@@ -462,9 +463,11 @@ def __test_preprocessing_sssr__(str_sub='sub11', run_id=1, opt_user=test_opt(Non
                                                    n_downsampling=opt_user.n_downsampling,
                                                    flag_use_motion_data=opt_user.use_motion_data)
 
+    return normalized_epoched_raw_dataset
 
-def __test_preprocessing_ssmr__(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
-                                str_arch='gru_arch_general4', opt_user=test_opt(None)):
+
+def _test_preprocessing_ssmr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
+                              str_arch='gru_arch_general4', opt_user=test_opt(None)):
     """
     Test preprocessing on single subject, multiple run.
 
@@ -472,11 +475,12 @@ def __test_preprocessing_ssmr__(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
     :param vec_run_id: list containing indices of the run, in the form [X1, X2, X3, ...]
     :param str_arch: name of the architecture to run
     :param opt_user: an opt object
+    :return vec_normalized_epoched_raw_dataset: preprocessed multi-run dataset
     """
 
-    # print('Process starting')
-    # starttime = datetime.datetime.now()
-    # print("The start time is {}\n\n".format(starttime.strftime("%Y/%m/%d %H:%M:%S")))
+    print('Process starting')
+    starttime = datetime.now()
+    print("The start time is {}\n\n".format(starttime.strftime("%Y/%m/%d %H:%M:%S")))
 
     """
     Preparing the dataset
@@ -491,10 +495,13 @@ def __test_preprocessing_ssmr__(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
                                                    n_downsampling=opt_user.n_downsampling,
                                                    flag_use_motion_data=opt_user.use_motion_data)
 
+    return vec_normalized_epoched_raw_dataset
+
 
 if __name__ == '__main__':
     """ used for debugging """
     from pathlib import Path
+
     settings.init(Path.home(), Path.home())  # Call only once
-    __test_preprocessing_sssr__('sub11', 1, test_opt(None))
-    __test_preprocessing_ssmr__('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))
+    _test_preprocessing_sssr_('sub11', 1, test_opt(None))
+    _test_preprocessing_ssmr_('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))
