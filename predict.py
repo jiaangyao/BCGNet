@@ -1,7 +1,5 @@
 import numpy as np
-import mne
-from sp.sp_normalization import renormalize
-from sp.sp_preprocessing import dataset_epoch
+from preprocessor import renormalize, dataset_epoch
 from utils.interpolate_dataset import *
 
 

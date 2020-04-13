@@ -435,13 +435,13 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
     return data_renorm
 
 
-def _test_preprocessing_sssr_(str_sub='sub11', run_id=1, opt_user=test_opt(None)):
+def preprocess_subject(str_sub, run_id, opt):
     """
-    Test preprocessing on single subject, single run.
+    Preprocess data of a single run from a single subject.
 
     :param str_sub: name of the subject in the form subXX
     :param run_id: index of the run, in the form X
-    :param opt_user: an opt object
+    :param opt: an opt object
     :return normalized_epoched_raw_dataset: preprocessed dataset
     """
     # Path setup
@@ -458,12 +458,14 @@ def _test_preprocessing_sssr_(str_sub='sub11', run_id=1, opt_user=test_opt(None)
     normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
     raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
     ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs,
-                                                   duration=opt_user.epoch_duration,
-                                                   threshold=opt_user.mad_threshold,
-                                                   n_downsampling=opt_user.n_downsampling,
-                                                   flag_use_motion_data=opt_user.use_motion_data)
+                                                   duration=opt.epoch_duration,
+                                                   threshold=opt.mad_threshold,
+                                                   n_downsampling=opt.n_downsampling,
+                                                   flag_use_motion_data=opt.use_motion_data)
 
-    return normalized_epoched_raw_dataset
+    return normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
+    raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
+    ecg_stats, eeg_stats, good_idx
 
 
 def _test_preprocessing_ssmr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
@@ -503,5 +505,5 @@ if __name__ == '__main__':
     from pathlib import Path
 
     settings.init(Path.home(), Path.home())  # Call only once
-    _test_preprocessing_sssr_('sub11', 1, test_opt(None))
+    preprocess_subject('sub11', 1, test_opt(None))
     _test_preprocessing_ssmr_('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))

@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 from tensorflow.python.keras.layers import Input, Bidirectional, CuDNNGRU, Dense, Dropout
 from tensorflow.python.keras import callbacks
 from tensorflow.python.keras import Model

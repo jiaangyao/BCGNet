@@ -3,27 +3,36 @@ demo.py - the custom script a user modifies (highest level). I guess we also wan
 a non-python interface version of this using argparse. Take a look at
 cluster/cluster_functions.py for an example of how to do this.
 """
-import bcg_net
-import data_loader
-import feature_extractor
-import ttv
-import settings
 from pathlib import Path
+import settings
+import options
+import preprocessor
+import dataset_splitter
+import training
+import ttv
 
 settings.init(Path.home(), Path.home())  # Call only once
 
-opt_data_loader = data_loader.opt_default()
-opt_data_loader.something = 'something_else'
-d_mne = data_loader.convert_to_mne(settings.d_root, opt_data_loader)
+# Parameters
+str_sub = 'sub11'
+run_id = 1
+opt = options.test_opt(None)
+str_arch = 'gru_arch_general4'
 
-opt_feature_extractor = feature_extractor.opt_default()
-opt_feature_extractor.something = 'something_else'
-d_features = feature_extractor.generate(d_mne, opt_feature_extractor)
+# Preprocess
+normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
+raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
+ecg_stats, eeg_stats, good_idx = preprocessor.preprocess_subject(str_sub=str_sub, run_id=run_id, opt=opt)
 
-opt_ttv = ttv.opt_default()
-opt_ttv.something = 'something_else'
-d_model = ttv.train(d_features, opt_ttv)  # train the model
-bcg = ttv.predict(d_features, d_model, opt_ttv)  # evaluate the model on all data
-eeg = ttv.clean(d_features, d_model, d_mne, opt_ttv)  # upsample bcg back to eeg sampling rate and subtract
+# Split data
+xs, ys, vec_ix_slice = dataset_splitter.generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt)
 
-# then we can write some helper stuff to do something with the output
+# Obtain the training and validation generators
+training_generator = training.Defaultgenerator(xs[0], ys[0], batch_size=opt.batch_size, shuffle=True)
+validation_generator = training.Defaultgenerator(xs[1], ys[1], batch_size=opt.batch_size, shuffle=True)
+
+# Train and fit
+model, callbacks_, m, epochs = ttv.train(training_generator, validation_generator, opt=opt,
+                                         str_arch=str_arch)
+ttv.predict(model, callbacks_, normalized_raw_dataset, raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, opt,
+            good_idx)

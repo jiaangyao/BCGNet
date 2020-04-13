@@ -2,7 +2,7 @@ import numpy as np
 import mne
 
 from options import test_opt
-from preprocessor import _test_preprocessing_sssr_, _test_preprocessing_ssmr_
+from preprocessor import preprocess_subject, _test_preprocessing_ssmr_
 from utils.context_management import temp_seed
 import settings
 
@@ -449,18 +449,22 @@ def gen_batches_rnn(data_list, flag_input):
     return batch_list
 
 
-def _test_generate_train_valid_test_(str_sub='sub11', run_id=1, opt_user=test_opt(None)):
-    normalized_epoched_raw_dataset = _test_preprocessing_sssr_(str_sub, run_id, opt_user)
-    generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt_user)
+def _test_generate_train_valid_test_(str_sub='sub11', run_id=1, opt=test_opt(None)):
+    normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
+    raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
+    ecg_stats, eeg_stats, good_idx = preprocess_subject(str_sub, run_id, opt)
+    xs, ys, vec_ix_slice = generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt)
+    return xs, ys, vec_ix_slice
 
 
 def _test_generate_train_valid_test_mr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
-                              str_arch='gru_arch_general4', opt_user=test_opt(None)):
-    vec_normalized_epoched_raw_dataset = _test_preprocessing_ssmr_(str_sub, vec_run_id, str_arch, opt_user)
+                                        str_arch='gru_arch_general4', opt=test_opt(None)):
+    vec_normalized_epoched_raw_dataset = _test_preprocessing_ssmr_(str_sub, vec_run_id, str_arch, opt)
 
     # Split the epoched dataset into training, validation and test sets
     mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice = \
-        generate_train_valid_test_mr(vec_normalized_epoched_raw_dataset, vec_run_id, opt=opt_user)
+        generate_train_valid_test_mr(vec_normalized_epoched_raw_dataset, vec_run_id, opt=opt)
+    return mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice
 
 
 if __name__ == '__main__':
