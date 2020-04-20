@@ -1,8 +1,39 @@
 import numpy as np
-import mne
+
+from dataset_splitter import split_epoched_dataset
 
 
-def compute_rms_epoched_dataset(epoched_raw_dataset_set, epoched_cleaned_dataset_set):
+def compute_rms(orig_sr_epoched_raw_dataset, orig_sr_epoched_cleaned_dataset, vec_ix_slice):
+    """
+    Split epoched dataset and compute the RMS value.
+
+    :param orig_sr_epoched_raw_dataset:
+    :param orig_sr_epoched_cleaned_dataset:
+    :param vec_ix_slice:
+    :return: vec_rms_test: [rms_raw_eeg_data_set, rms_cleaned_eeg_data_set]
+    """
+    # Obtain the equivalent test epochs used during training from raw, OBS-cleaned and andBCGNet-cleaned data
+    vec_epoched_raw_dataset_set = split_epoched_dataset(orig_sr_epoched_raw_dataset, vec_ix_slice)
+    vec_epoched_cleaned_dataset_set = split_epoched_dataset(orig_sr_epoched_cleaned_dataset,
+                                                            vec_ix_slice)
+
+    orig_sr_epoched_raw_dataset_test = vec_epoched_raw_dataset_set[-1]
+    orig_sr_epoched_cleaned_dataset_test = vec_epoched_cleaned_dataset_set[-1]
+
+    # Computing the RMS using the test set
+    vec_rms_test = _compute_rms_epoched_dataset_(orig_sr_epoched_raw_dataset_test, orig_sr_epoched_cleaned_dataset_test)
+
+    print("\n#############################################")
+    print("#                  Results                  #")
+    print("#############################################\n")
+    print("RMS VALUES:")
+    print("RMS Raw: {}".format(vec_rms_test[0]))
+    print("RMS OBS: {}".format(vec_rms_test[1]))
+    print("RMS BCGNet: {}".format(vec_rms_test[2]))
+    return vec_rms_test
+
+
+def _compute_rms_epoched_dataset_(epoched_raw_dataset_set, epoched_cleaned_dataset_set):
     """
     Compute the RMS value based on epoched dataset (i.e. from a specific group such as test set during training)
 
@@ -10,7 +41,7 @@ def compute_rms_epoched_dataset(epoched_raw_dataset_set, epoched_cleaned_dataset
         data is in the form of (epoch, channel, data)
     :param epoched_cleaned_dataset_set: mne.io_ops.RawArray object holding the epoched data from the BCGNet-cleaned dataset
 
-    :return:
+    :return: vec_rms_set: [rms_raw_eeg_data_set, rms_cleaned_eeg_data_set]
     """
 
     # Obtain the set data for all three datasets and change unit to micro V

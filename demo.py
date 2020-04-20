@@ -10,6 +10,7 @@ import preprocessor
 import dataset_splitter
 import training
 import ttv
+from utils.compute_rms import compute_rms
 
 settings.init(Path.home(), Path.home())  # Call only once
 
@@ -20,9 +21,9 @@ opt = options.test_opt(None)
 str_arch = 'gru_arch_general4'
 
 # Preprocess
-normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
-raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
-ecg_stats, eeg_stats, good_idx = preprocessor.preprocess_subject(str_sub=str_sub, run_id=run_id, opt=opt)
+normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, raw_dataset, orig_sr_epoched_raw_dataset, \
+orig_sr_raw_dataset, ecg_stats, eeg_stats, good_idx = preprocessor.preprocess_subject(str_sub=str_sub, run_id=run_id,
+                                                                                      opt=opt)
 
 # Split data
 xs, ys, vec_ix_slice = dataset_splitter.generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt)
@@ -32,7 +33,9 @@ training_generator = training.Defaultgenerator(xs[0], ys[0], batch_size=opt.batc
 validation_generator = training.Defaultgenerator(xs[1], ys[1], batch_size=opt.batch_size, shuffle=True)
 
 # Train and fit
-model, callbacks_, m, epochs = ttv.train(training_generator, validation_generator, opt=opt,
-                                         str_arch=str_arch)
-ttv.predict(model, callbacks_, normalized_raw_dataset, raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, opt,
-            good_idx)
+model, callbacks_, m, epochs = ttv.train(training_generator, validation_generator, opt=opt, str_arch=str_arch)
+orig_sr_epoched_cleaned_dataset, orig_sr_cleaned_dataset, epoched_cleaned_dataset, cleaned_dataset = ttv.predict(model,
+callbacks_, normalized_raw_dataset, raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, opt, good_idx)
+
+# Results
+vec_rms_test = compute_rms(orig_sr_epoched_raw_dataset, orig_sr_epoched_cleaned_dataset, vec_ix_slice)
