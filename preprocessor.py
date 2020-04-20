@@ -464,12 +464,12 @@ def preprocess_subject(str_sub, run_id, opt):
                                                    flag_use_motion_data=opt.use_motion_data)
 
     return normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
-    raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
-    ecg_stats, eeg_stats, good_idx
+           raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
+           ecg_stats, eeg_stats, good_idx
 
 
-def _test_preprocessing_ssmr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
-                              str_arch='gru_arch_general4', opt_user=test_opt(None)):
+def preprocess_subject_mr(str_sub='sub11', vec_run_id=None,
+                          str_arch='gru_arch_general4', opt_user=test_opt(None)):
     """
     Test preprocessing on single subject, multiple run.
 
@@ -478,7 +478,17 @@ def _test_preprocessing_ssmr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
     :param str_arch: name of the architecture to run
     :param opt_user: an opt object
     :return vec_normalized_epoched_raw_dataset: preprocessed multi-run dataset
+    :return vec_normalized_raw_dataset: TODO
+    :return vec_epoched_raw_dataset:  TODO
+    :return vec_raw_dataset: TODO
+    :return vec_orig_sr_epoched_raw_dataset: TODO
+    :return vec_orig_sr_raw_dataset: TODO
+    :return vec_ecg_stats: TODO
+    :return vec_eeg_stats: TODO
+    :return vec_good_idx: TODO
     """
+    if vec_run_id is None:
+        vec_run_id = [1, 2, 3, 4, 5]
 
     print('Process starting')
     starttime = datetime.now()
@@ -497,7 +507,9 @@ def _test_preprocessing_ssmr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
                                                    n_downsampling=opt_user.n_downsampling,
                                                    flag_use_motion_data=opt_user.use_motion_data)
 
-    return vec_normalized_epoched_raw_dataset
+    return vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, \
+           vec_raw_dataset, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, vec_ecg_stats, \
+           vec_eeg_stats, vec_good_idx
 
 
 if __name__ == '__main__':
@@ -506,4 +518,4 @@ if __name__ == '__main__':
 
     settings.init(Path.home(), Path.home())  # Call only once
     preprocess_subject('sub11', 1, test_opt(None))
-    _test_preprocessing_ssmr_('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))
+    preprocess_subject_mr('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))

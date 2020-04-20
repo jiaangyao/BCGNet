@@ -3,6 +3,7 @@ demo.py - the custom script a user modifies (highest level). I guess we also wan
 a non-python interface version of this using argparse. Take a look at
 cluster/cluster_functions.py for an example of how to do this.
 """
+from datetime import datetime
 from pathlib import Path
 import settings
 import options
@@ -16,26 +17,13 @@ settings.init(Path.home(), Path.home())  # Call only once
 
 # Parameters
 str_sub = 'sub11'
-run_id = 1
+run_id = [1, 2, 3, 4, 5]
 opt = options.test_opt(None)
 str_arch = 'gru_arch_general4'
 
 # Preprocess
-normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, raw_dataset, orig_sr_epoched_raw_dataset, \
-orig_sr_raw_dataset, ecg_stats, eeg_stats, good_idx = preprocessor.preprocess_subject(str_sub=str_sub, run_id=run_id,
-                                                                                      opt=opt)
-
-# Split data
-xs, ys, vec_ix_slice = dataset_splitter.generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt)
-
-# Obtain the training and validation generators
-training_generator = training.Defaultgenerator(xs[0], ys[0], batch_size=opt.batch_size, shuffle=True)
-validation_generator = training.Defaultgenerator(xs[1], ys[1], batch_size=opt.batch_size, shuffle=True)
-
-# Train and fit
-model, callbacks_, m, epochs = ttv.train(training_generator, validation_generator, opt=opt, str_arch=str_arch)
-orig_sr_epoched_cleaned_dataset, orig_sr_cleaned_dataset, epoched_cleaned_dataset, cleaned_dataset = ttv.predict(model,
-callbacks_, normalized_raw_dataset, raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, opt, good_idx)
-
-# Results
-vec_rms_test = compute_rms(orig_sr_epoched_raw_dataset, orig_sr_epoched_cleaned_dataset, vec_ix_slice)
+# Load, normalize and epoch the raw dataset from all runs
+vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, vec_raw_dataset, \
+vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, \
+vec_ecg_stats, vec_eeg_stats, vec_good_idx \
+ = preprocessor.preprocess_subject_mr(str_sub, run_id, str_arch, opt)

@@ -2,7 +2,7 @@ import numpy as np
 import mne
 
 from options import test_opt
-from preprocessor import preprocess_subject, _test_preprocessing_ssmr_
+from preprocessor import preprocess_subject, preprocess_subject_mr
 from utils.context_management import temp_seed
 import settings
 
@@ -457,9 +457,12 @@ def _test_generate_train_valid_test_(str_sub='sub11', run_id=1, opt=test_opt(Non
     return xs, ys, vec_ix_slice
 
 
-def _test_generate_train_valid_test_mr_(str_sub='sub11', vec_run_id=[1, 2, 3, 4, 5],
+def _test_generate_train_valid_test_mr_(str_sub='sub11', vec_run_id=None,
                                         str_arch='gru_arch_general4', opt=test_opt(None)):
-    vec_normalized_epoched_raw_dataset = _test_preprocessing_ssmr_(str_sub, vec_run_id, str_arch, opt)
+    if vec_run_id is None:
+        vec_run_id = [1, 2, 3, 4, 5]
+
+    vec_normalized_epoched_raw_dataset = preprocess_subject_mr(str_sub, vec_run_id, str_arch, opt)
 
     # Split the epoched dataset into training, validation and test sets
     mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice = \
