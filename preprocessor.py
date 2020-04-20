@@ -435,47 +435,12 @@ def renormalize(data, stats, flag_multi_ch, flag_time_series):
     return data_renorm
 
 
-def preprocess_subject(str_sub, run_id, opt):
-    """
-    Preprocess data of a single run from a single subject.
-
-    :param str_sub: name of the subject in the form subXX
-    :param run_id: index of the run, in the form X
-    :param opt: an opt object
-    :return normalized_epoched_raw_dataset: preprocessed dataset
-    """
-    # Path setup
-    p_rs, f_rs = rs_path(str_sub, run_id)
-    p_obs, f_obs = obs_path(str_sub, run_id)
-
-    pfe_rs = str(p_rs / f_rs)
-    pfe_obs = str(p_obs / f_obs)
-
-    """
-    Preparing the dataset
-    """
-    # Load, normalize and epoch the raw dataset
-    normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
-    raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
-    ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs,
-                                                   duration=opt.epoch_duration,
-                                                   threshold=opt.mad_threshold,
-                                                   n_downsampling=opt.n_downsampling,
-                                                   flag_use_motion_data=opt.use_motion_data)
-
-    return normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
-           raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
-           ecg_stats, eeg_stats, good_idx
-
-
-def preprocess_subject_mr(str_sub='sub11', vec_run_id=None,
-                          str_arch='gru_arch_general4', opt_user=test_opt(None)):
+def preprocess_subject(str_sub, vec_run_id, opt_user=test_opt(None)):
     """
     Test preprocessing on single subject, multiple run.
 
     :param str_sub: name of the subject in the form subXX
     :param vec_run_id: list containing indices of the run, in the form [X1, X2, X3, ...]
-    :param str_arch: name of the architecture to run
     :param opt_user: an opt object
     :return vec_normalized_epoched_raw_dataset: preprocessed multi-run dataset
     :return vec_normalized_raw_dataset: TODO
@@ -487,8 +452,11 @@ def preprocess_subject_mr(str_sub='sub11', vec_run_id=None,
     :return vec_eeg_stats: TODO
     :return vec_good_idx: TODO
     """
-    if vec_run_id is None:
-        vec_run_id = [1, 2, 3, 4, 5]
+    if not isinstance(vec_run_id, list):
+        if isinstance(vec_run_id, int):
+            vec_run_id = [vec_run_id]
+        else:
+            raise Exception("Unsupported type; vec_run_id must be a list or an int.")
 
     print('Process starting')
     starttime = datetime.now()
@@ -517,5 +485,4 @@ if __name__ == '__main__':
     from pathlib import Path
 
     settings.init(Path.home(), Path.home())  # Call only once
-    preprocess_subject('sub11', 1, test_opt(None))
-    preprocess_subject_mr('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))
+    preprocess_subject('sub11', [1, 2, 3, 4, 5], test_opt(None))

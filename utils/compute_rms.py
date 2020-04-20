@@ -1,36 +1,55 @@
 import numpy as np
 
-from dataset_splitter import split_epoched_dataset
+from dataset_splitter import split_epoched_dataset_mr
 
 
-def compute_rms(orig_sr_epoched_raw_dataset, orig_sr_epoched_cleaned_dataset, vec_ix_slice):
+def compute_rms(vec_run_id, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_epoched_cleaned_dataset, mr_ten_ix_slice):
     """
     Split epoched dataset and compute the RMS value.
 
-    :param orig_sr_epoched_raw_dataset:
-    :param orig_sr_epoched_cleaned_dataset:
-    :param vec_ix_slice:
-    :return: vec_rms_test: [rms_raw_eeg_data_set, rms_cleaned_eeg_data_set]
+    :param vec_run_id: TODO
+    :param vec_orig_sr_epoched_raw_dataset: TODO
+    :param vec_orig_sr_epoched_cleaned_dataset: TODO
+    :param mr_ten_ix_slice: TODO
+    :return: mat_rms_test: TODO
     """
-    # Obtain the equivalent test epochs used during training from raw, OBS-cleaned and andBCGNet-cleaned data
-    vec_epoched_raw_dataset_set = split_epoched_dataset(orig_sr_epoched_raw_dataset, vec_ix_slice)
-    vec_epoched_cleaned_dataset_set = split_epoched_dataset(orig_sr_epoched_cleaned_dataset,
-                                                            vec_ix_slice)
+    # Obtain the equivalent test epochs used during training from raw, OBS-cleaned and BCGNet-cleaned data
+    mat_epoched_raw_dataset = split_epoched_dataset_mr(vec_orig_sr_epoched_raw_dataset, mr_ten_ix_slice)
+    mat_epoched_cleaned_dataset = split_epoched_dataset_mr(vec_orig_sr_epoched_cleaned_dataset, mr_ten_ix_slice)
 
-    orig_sr_epoched_raw_dataset_test = vec_epoched_raw_dataset_set[-1]
-    orig_sr_epoched_cleaned_dataset_test = vec_epoched_cleaned_dataset_set[-1]
+    vec_orig_sr_epoched_raw_dataset_test = []
+    vec_orig_sr_epoched_cleaned_dataset_test = []
+    mat_rms_test = []
 
-    # Computing the RMS using the test set
-    vec_rms_test = _compute_rms_epoched_dataset_(orig_sr_epoched_raw_dataset_test, orig_sr_epoched_cleaned_dataset_test)
+    for i in range(len(vec_run_id)):
+        vec_epoched_raw_dataset = mat_epoched_raw_dataset[i]
+        vec_epoched_cleaned_dataset = mat_epoched_cleaned_dataset[i]
+
+        orig_sr_epoched_raw_dataset_test = vec_epoched_raw_dataset[-1]
+        orig_sr_epoched_cleaned_dataset_test = vec_epoched_cleaned_dataset[-1]
+
+        # Computing the RMS using the test set
+        vec_rms_test = _compute_rms_epoched_dataset_(orig_sr_epoched_raw_dataset_test,
+                                                     orig_sr_epoched_cleaned_dataset_test)
+
+        vec_orig_sr_epoched_raw_dataset_test.append(orig_sr_epoched_raw_dataset_test)
+        vec_orig_sr_epoched_cleaned_dataset_test.append(orig_sr_epoched_cleaned_dataset_test)
+        mat_rms_test.append(vec_rms_test)
 
     print("\n#############################################")
     print("#                  Results                  #")
     print("#############################################\n")
-    print("RMS VALUES:")
-    print("RMS Raw: {}".format(vec_rms_test[0]))
-    print("RMS OBS: {}".format(vec_rms_test[1]))
-    print("RMS BCGNet: {}".format(vec_rms_test[2]))
-    return vec_rms_test
+
+    for i in range(len(vec_run_id)):
+        vec_rms_test = mat_rms_test[i]
+        orig_sr_epoched_raw_dataset_test = vec_orig_sr_epoched_raw_dataset_test[i]
+        orig_sr_epoched_cleaned_dataset_test = vec_orig_sr_epoched_cleaned_dataset_test[i]
+
+        print("RMS VALUES: RUN {}".format(vec_run_id[i]))
+        print("RMS Raw: {}".format(vec_rms_test[0]))
+        print("RMS BCGNet: {}".format(vec_rms_test[1]))
+
+    return mat_rms_test
 
 
 def _compute_rms_epoched_dataset_(epoched_raw_dataset_set, epoched_cleaned_dataset_set):

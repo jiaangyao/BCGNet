@@ -2,7 +2,7 @@ import numpy as np
 import mne
 
 from options import test_opt
-from preprocessor import preprocess_subject, preprocess_subject_mr
+from preprocessor import preprocess_subject
 from utils.context_management import temp_seed
 import settings
 
@@ -449,20 +449,16 @@ def gen_batches_rnn(data_list, flag_input):
     return batch_list
 
 
-def _test_generate_train_valid_test_(str_sub='sub11', run_id=1, opt=test_opt(None)):
-    normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, \
-    raw_dataset, orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
-    ecg_stats, eeg_stats, good_idx = preprocess_subject(str_sub, run_id, opt)
-    xs, ys, vec_ix_slice = generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt)
-    return xs, ys, vec_ix_slice
+def _test_generate_train_valid_test_(str_sub, vec_run_id, opt=test_opt(None)):
+    if not isinstance(vec_run_id, list):
+        if isinstance(vec_run_id, int):
+            vec_run_id = [vec_run_id]
+        else:
+            raise Exception("Unsupported type; vec_run_id must be a list or an int.")
 
-
-def _test_generate_train_valid_test_mr_(str_sub='sub11', vec_run_id=None,
-                                        str_arch='gru_arch_general4', opt=test_opt(None)):
-    if vec_run_id is None:
-        vec_run_id = [1, 2, 3, 4, 5]
-
-    vec_normalized_epoched_raw_dataset = preprocess_subject_mr(str_sub, vec_run_id, str_arch, opt)
+    vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, vec_raw_dataset, \
+    vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, \
+    vec_ecg_stats, vec_eeg_stats, vec_good_idx = preprocess_subject(str_sub, vec_run_id, opt)
 
     # Split the epoched dataset into training, validation and test sets
     mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice = \
@@ -475,5 +471,4 @@ if __name__ == '__main__':
     from pathlib import Path
 
     settings.init(Path.home(), Path.home())  # Call only once
-    _test_generate_train_valid_test_('sub11', 1, test_opt(None))
-    _test_generate_train_valid_test_mr_('sub11', [1, 2, 3, 4, 5], 'gru_arch_general4', test_opt(None))
+    _test_generate_train_valid_test_('sub11', [1, 2, 3, 4, 5], test_opt(None))

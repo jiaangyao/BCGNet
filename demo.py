@@ -16,26 +16,32 @@ settings.init(Path.home(), Path.home())  # Call only once
 
 # Parameters
 str_sub = 'sub11'
-run_id = 1
+vec_run_id = [1, 2]
 opt = options.test_opt(None)
 str_arch = 'gru_arch_general4'
 
 # Preprocess
-normalized_epoched_raw_dataset, normalized_raw_dataset, epoched_raw_dataset, raw_dataset, orig_sr_epoched_raw_dataset, \
-orig_sr_raw_dataset, ecg_stats, eeg_stats, good_idx = preprocessor.preprocess_subject(str_sub=str_sub, run_id=run_id,
-                                                                                      opt=opt)
+# Load, normalize and epoch the raw dataset from all runs
+vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, vec_raw_dataset, \
+vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, vec_ecg_stats, vec_eeg_stats, vec_good_idx \
+    = preprocessor.preprocess_subject(str_sub, vec_run_id, opt)
 
-# Split data
-xs, ys, vec_ix_slice = dataset_splitter.generate_train_valid_test(normalized_epoched_raw_dataset, opt=opt)
+# Split the epoched dataset into training, validation and test sets
+mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice = \
+    dataset_splitter.generate_train_valid_test_mr(vec_normalized_epoched_raw_dataset, vec_run_id, opt=opt)
 
 # Obtain the training and validation generators
-training_generator = training.Defaultgenerator(xs[0], ys[0], batch_size=opt.batch_size, shuffle=True)
-validation_generator = training.Defaultgenerator(xs[1], ys[1], batch_size=opt.batch_size, shuffle=True)
+training_generator = training.Defaultgenerator(mr_combined_xs[0], mr_combined_ys[0], batch_size=opt.batch_size,
+                                               shuffle=True)
+validation_generator = training.Defaultgenerator(mr_combined_xs[1], mr_combined_ys[1], batch_size=opt.batch_size,
+                                                 shuffle=True)
 
 # Train and fit
 model, callbacks_, m, epochs = ttv.train(training_generator, validation_generator, opt=opt, str_arch=str_arch)
-orig_sr_epoched_cleaned_dataset, orig_sr_cleaned_dataset, epoched_cleaned_dataset, cleaned_dataset = ttv.predict(model,
-callbacks_, normalized_raw_dataset, raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, opt, good_idx)
+vec_orig_sr_epoched_cleaned_dataset, vec_orig_sr_cleaned_dataset, vec_epoched_cleaned_dataset, vec_cleaned_dataset \
+    = ttv.predict(model, callbacks_, vec_normalized_raw_dataset, vec_raw_dataset, vec_orig_sr_raw_dataset,
+                  vec_ecg_stats, vec_eeg_stats, opt, vec_good_idx)
 
 # Results
-vec_rms_test = compute_rms(orig_sr_epoched_raw_dataset, orig_sr_epoched_cleaned_dataset, vec_ix_slice)
+mat_rms_test = compute_rms(vec_run_id, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_epoched_cleaned_dataset,
+                           mr_ten_ix_slice)
