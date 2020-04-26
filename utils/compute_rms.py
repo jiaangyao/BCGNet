@@ -1,6 +1,7 @@
 import numpy as np
 
 from dataset_splitter import split_epoched_dataset_mr
+from utils.compute_psd import tabulate_band_power_reduction
 
 
 def compute_rms(vec_run_id, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_epoched_cleaned_dataset, mr_ten_ix_slice):
@@ -48,6 +49,12 @@ def compute_rms(vec_run_id, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_epoched
         print("RMS VALUES: RUN {}".format(vec_run_id[i]))
         print("RMS Raw: {}".format(vec_rms_test[0]))
         print("RMS BCGNet: {}".format(vec_rms_test[1]))
+
+        # Compute the reduction in each power band
+        print("\nFREQUENCY BAND POWER REDUCTION: RUN {}".format(vec_run_id[i]))
+        tabulate_band_power_reduction(orig_sr_epoched_raw_dataset_test,
+                                      orig_sr_epoched_cleaned_dataset_test)
+        print('\n\n\n')
 
     return mat_rms_test
 

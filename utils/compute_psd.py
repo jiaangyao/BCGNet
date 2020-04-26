@@ -141,14 +141,12 @@ def compute_band_power(f_eeg, Pxx_eeg, cutoff_low, cutoff_high):
     return band_power
 
 
-def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_obs_dataset_set,
-                                  epoched_cleaned_dataset_set):
+def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_dataset_set):
     """
     Compute the power in each frequency band of interest and compute the power ratio
 
     :param epoched_raw_dataset_set: mne.io_ops.EpochArray object holding the epoched data from the raw dataset, note that the
         data is in the form of (epoch, channel, data)
-    :param epoched_obs_dataset_set: mne.io_ops.EpochArray object holding the epoched data from the OBS-cleaned dataset
     :param epoched_cleaned_dataset_set: mne.io_ops.EpochArray object holding the epoched data from the BCGNet-cleaned dataset
     """
 
@@ -159,7 +157,6 @@ def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_obs_dataset_s
 
     # Compute the mean PSD across all channels
     f_avg_raw_set, Pxx_avg_raw_set = compute_mean_psd(epoched_raw_dataset_set)
-    f_avg_obs_set, Pxx_avg_obs_set = compute_mean_psd(epoched_obs_dataset_set)
     f_avg_cleaned_set, Pxx_avg_cleaned_set = compute_mean_psd(epoched_cleaned_dataset_set)
 
     # Compute the power in each frequency band
@@ -174,42 +171,33 @@ def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_obs_dataset_s
 
     # Compute the power in delta band
     delta_raw = compute_band_power(f_avg_raw_set, Pxx_avg_raw_set, cutoff_low_delta, cutoff_high_delta)
-    delta_obs = compute_band_power(f_avg_obs_set, Pxx_avg_obs_set, cutoff_low_delta, cutoff_high_delta)
     delta_cleaned = compute_band_power(f_avg_cleaned_set, Pxx_avg_cleaned_set, cutoff_low_delta, cutoff_high_delta)
 
-    delta_ratio_raw_obs = delta_obs / delta_raw
     delta_ratio_raw_cleaned = delta_cleaned / delta_raw
 
-    delta_table = [['OBS', delta_obs, delta_ratio_raw_obs],
-                   ['BCGNet', delta_cleaned, delta_ratio_raw_cleaned]]
+    delta_table = [['BCGNet', delta_cleaned, delta_ratio_raw_cleaned]]
 
     print('Results for Delta band')
     print(tabulate(delta_table, headers=['Type', 'Total Power', 'Ratio to BCE']))
 
     # Compute the power in theta band
     theta_raw = compute_band_power(f_avg_raw_set, Pxx_avg_raw_set, cutoff_low_theta, cutoff_high_theta)
-    theta_obs = compute_band_power(f_avg_obs_set, Pxx_avg_obs_set, cutoff_low_theta, cutoff_high_theta)
     theta_cleaned = compute_band_power(f_avg_cleaned_set, Pxx_avg_cleaned_set, cutoff_low_theta, cutoff_high_theta)
 
-    theta_ratio_raw_obs = theta_obs / theta_raw
     theta_ratio_raw_cleaned = theta_cleaned / theta_raw
 
-    theta_table = [['OBS', theta_obs, theta_ratio_raw_obs],
-                   ['BCGNet', theta_cleaned, theta_ratio_raw_cleaned]]
+    theta_table = [['BCGNet', theta_cleaned, theta_ratio_raw_cleaned]]
 
     print('\n\nResults for Theta band')
     print(tabulate(theta_table, headers=['Type', 'Total Power', 'Ratio to BCE']))
 
     # Compute the power in alpha band
     alpha_raw = compute_band_power(f_avg_raw_set, Pxx_avg_raw_set, cutoff_low_alpha, cutoff_high_alpha)
-    alpha_obs = compute_band_power(f_avg_obs_set, Pxx_avg_obs_set, cutoff_low_alpha, cutoff_high_alpha)
     alpha_cleaned = compute_band_power(f_avg_cleaned_set, Pxx_avg_cleaned_set, cutoff_low_alpha, cutoff_high_alpha)
 
-    alpha_ratio_raw_obs = alpha_obs / alpha_raw
     alpha_ratio_raw_cleaned = alpha_cleaned / alpha_raw
 
-    alpha_table = [['OBS', alpha_obs, alpha_ratio_raw_obs],
-                   ['BCGNet', alpha_cleaned, alpha_ratio_raw_cleaned]]
+    alpha_table = [['BCGNet', alpha_cleaned, alpha_ratio_raw_cleaned]]
 
     print('\n\nResults for Alpha band')
     print(tabulate(alpha_table, headers=['Type', 'Total Power', 'Ratio to BCE']))
