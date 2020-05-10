@@ -46,6 +46,7 @@ def init(_project_name, _d_root):
     global d_mne
     d_mne = d_root / 'proc_bcgnet' / 'mne/'  # data_loader.py output goes here
 
+    # TODO: This one is outdated. To be deleted.
     global d_features
     d_features = d_root / 'proc_bcgnet' / 'features' / '$experiment_id$'
     # feature_extractor.py output goes here

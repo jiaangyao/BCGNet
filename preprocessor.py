@@ -1,45 +1,11 @@
 import scipy.stats as stats
-from collections import namedtuple
 from utils.context_management import suppress_stdout
-from settings import rs_path, obs_path
+from settings import rs_path
 import numpy as np
 import mne
 import settings
 from datetime import datetime
 from options import test_opt
-
-Opt = namedtuple('Opt', ['input_feature', 'output_features',
-                         'd_features', 't_epoch', 'generate',
-                         'fs_ds', 'p_training', 'p_validation',
-                         'p_evaluation'])
-
-
-def opt_default():
-    """
-    This is a function in feature_extractor.py with default settings
-    not sure if there is a type in the channel settings in MNE, but if
-    so that would be the easiest…:
-
-    :return:
-    """
-    return Opt(
-        # if the feature_type opt are None, then you can specify manually,
-        # e.g. opt.input_feature = [0, 1, 2] or, opt.input_feature =
-        # [‘Fz’, ‘Cz’] etc.
-        input_feature=['ecg'],
-        output_features=['eeg'],
-        d_features=settings.d_root / 'Local/working_eegbcg/proc_bcgnet/features/',
-        t_epoch=2,
-        # generate=generate_ws_features,  # train and test within subject.
-        # To test across subject, or test within run we define new functions
-        # here some extensions might fit neatly within generate_ws_features,
-        # for some we might need entirely new functions specified here.
-        fs_ds=100,  # frequency at which to downsample (this gets inverted
-        # at the end of the pipeline)
-        p_training=0.15,
-        p_validation=0.15,
-        p_evaluation=0.7
-    )
 
 
 def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_motion_data):

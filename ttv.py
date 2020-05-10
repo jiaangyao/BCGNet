@@ -1,45 +1,10 @@
-from collections import namedtuple
 import tensorflow as tf
 import settings
-import bcg_net_architecture
-import bcg_net_architecture.arch0001
-import bcg_net_architecture.gru_arch_general4
 from preprocessor import preprocess_subject
 from training import *
 from predict import *
 from options import test_opt
 from dataset_splitter import _test_generate_train_valid_test_, generate_train_valid_test_mr
-
-Opt = namedtuple('Opt', ['input_feature', 'output_features',
-                         'd_features', 't_epoch', 'generate',
-                         'fs_ds', 'p_training', 'p_validation',
-                         'p_evaluation'])
-
-
-def opt_default():
-    """
-    This is a function in ttv.py with default settings.
-
-    :return:
-    """
-    Opt = namedtuple('Opt', ['epochs', 'es_min_delta', 'es_patience',
-                             'early_stopping', 'resume', 'overwrite',
-                             'validation', 'ttv_split', 'debug_mode',
-                             'arch', 'extra_string'])
-
-    return Opt(
-        epochs=2500,
-        es_min_delta=1e-5,
-        es_patience=25,  # How many times does the validation not increase
-        early_stopping=True,
-        resume=True,
-        overwrite=False,
-        validation=None,
-        ttv_split=[0.7, 0.15, 0.15],  # train/test/validate split
-        debug_mode=False,  # more output, also plots
-        arch=bcg_net_architecture.arch0001,
-        extra_string=''
-    )
 
 
 def train(training_generator, validation_generator, opt=test_opt(None), str_arch='gru_arch_general4'):
