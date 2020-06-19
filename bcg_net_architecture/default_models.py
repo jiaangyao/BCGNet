@@ -1,44 +1,36 @@
 import tensorflow as tf
-from tensorflow.python.keras.models import Sequential, Model
-from tensorflow.python.keras import callbacks, regularizers, optimizers
+from tensorflow.python.keras import callbacks, optimizers
+from tensorflow.python.keras.models import Model
+from tensorflow.python.keras.regularizers import l2
 from tensorflow.python.keras import backend as K
 import os
 
 
-class nn_model():
+class nn_model:
     def __init__(self):
-        self._name = None
+        self.name = None
+        self.model = None
+        self.optimizer = None
 
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, value):
-        self._name = value
-
-    def model(self, n_input, n_output, opt_feature_extract):
-        raise NotImplementedError
-
-    def get_name(self):
+    @staticmethod
+    def get_name():
         """
         Get the name of the arch.
 
         :return: The name of the arch.
         """
         filename = os.path.basename(__file__)
-        self.name(os.path.splitext(filename)[0])
+        return os.path.splitext(filename)[0]
 
-    def model(self):
+    @staticmethod
+    def init_model(self):
         raise NotImplementedError
 
-    @classmethod
     def disable(self):
         for layer in self.model.layers:
             layer.trainable = False
         self.model.trainable = False
 
-    @classmethod
     def enable(self):
         for layer in self.model.layers:
             layer.trainable = True
@@ -46,49 +38,63 @@ class nn_model():
 
 
 class rnn_model(nn_model):
-    def __init__(self, lr=1e-2, opt_type='adam', **kwargs):
+    def __init__(self, n_input=1, n_output=63, lr=1e-2, opt_type='adam', opt_feature_extract=None, **kwargs):
         """
-        lr: learning rate
-        opt_type: chosen type of optimizer, allowed to be adam, rmsprop or sgd
-        kwargs: clipnorm: normalized value for gradient clipping
-                clipvalue: numerical value for gradient clipping
+        Constructor for RNN model
 
-                and other Keras optimizier parameters for the chosen optimizer
+        :param int n_input: number of input dimensions (number of ECG + aux channels)
+        :param int n_output: number of output (number of EEG channels)
+        :param float lr: learning rate
+        :param str opt_type: chosen type of optimizer, allowed to be adam, rmsprop or sgd
+        :param object opt_feature_extract: option object from feature extraction step
+        :param kwargs: clipnorm: normalized value for gradient clipping
+                       clipvalue: numerical value for gradient clipping
+
+                       and other Keras optimizier parameters for the chosen optimizer
+
+        :return: initialized model object
+
         """
         super().__init__()
-        self._lr = lr
+        self.name = self.get_name()
+        self.lr = lr
+        self.opt_type = opt_type.lower()
+        self.n_input = n_input
+        self.n_output = n_output
+        self.opt_feature_extract = opt_feature_extract
 
         if opt_type.lower() == 'adam':
-            self._opt = optimizers.Adam(lr=lr, **kwargs)
+            self.optimizer = optimizers.Adam(lr=lr, **kwargs)
 
         elif opt_type.lower() == 'rmsprop':
-            self._opt = optimizers.RMSprop(lr=lr, **kwargs)
+            self.optimizer = optimizers.RMSprop(lr=lr, **kwargs)
 
         elif opt_type.lower() == 'sgd':
-            self._opt = optimizers.SGD(lr=lr, **kwargs)
+            self.optimizer = optimizers.SGD(lr=lr, **kwargs)
 
         else:
             raise NotImplementedError
 
-    @property
-    def opt(self):
-        return self._opt
-
-    def model(self, n_input, n_output, opt_feature_extract):
+    def init_model(self):
         """
-        Default model based on our paper
+        Initialize the default model based on our paper properly depending on the version of tensorflow
+
         """
 
         if int(tf.__version__[0]) > 1:
-            return self.model_tf_v2(n_input, n_output, opt_feature_extract)
+            self.model = self.model_tf_v2(self.n_input, self.n_output, self.opt_feature_extract)
 
         else:
-            return self.model_tf_v1(n_input, n_output, opt_feature_extract)
+            self.model = self.model_tf_v1(self.n_input, self.n_output, self.opt_feature_extract)
 
-
-    def model_tf_v2(self, n_input, n_output, opt_feature_extract):
+    # TODO: implement compatibility check with opt_feature_extract
+    @staticmethod
+    def model_tf_v2(n_input, n_output, opt_feature_extract):
         """
-        tensorflow 2.0.0 CuDNNGRU layers are deprecated
+        Initialize the tensorflow 2.X version of the model
+
+        Note:
+        from tensorflow 2.0.0 onwards CuDNNGRU layers are deprecated
         instead the CuDNN implementation is used by default if:
         1. `activation` == `tanh`
         2. `recurrent_activation` == `sigmoid`
@@ -97,6 +103,14 @@ class rnn_model(nn_model):
         5. `use_bias` is `True`
         6. Inputs are not masked or strictly right padded.
         7. reset_after == True
+
+        here implementation also set to 1 to avoid issues with tf loss value blowing up
+
+        :param int n_input: number of input dimensions (number of ECG + aux channels)
+        :param int n_output: number of output (number of EEG channels)
+        :param object opt_feature_extract: option object from feature extraction step
+
+        :return: initialized model
         """
 
         from tensorflow.python.keras.layers import Input, Bidirectional, GRU, Dense, Dropout
@@ -105,50 +119,112 @@ class rnn_model(nn_model):
         sess = tf.compat.v1.Session(config=session_config)
 
         K.set_floatx('float64')
-        ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
+        ecg_input = Input(shape=(None, n_input), dtype='float64', name='ecg_input')
 
-    def model_tf_v1(self):
+        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=1,
+                              recurrent_regularizer=l2(0.096),
+                              activity_regularizer=l2(0.030)))(ecg_input)
+
+        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=1,
+                              recurrent_regularizer=l2(0.090),
+                              activity_regularizer=l2(0.013)))(x)
+
+        x = Dense(8, activation='relu')(x)
+        x = Dropout(0.327)(x)
+
+        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=1,
+                              recurrent_regularizer=l2(0.024),
+                              activity_regularizer=l2(0.067)))(x)
+
+        x = Bidirectional(GRU(64, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=1,
+                              recurrent_regularizer=l2(2.48e-07),
+                              activity_regularizer=l2(0.055)))(x)
+
+        bcg_out = Dense(n_output, activation='linear')(x)
+        model = Model(inputs=ecg_input, outputs=bcg_out)
+
+        return model
+
+    # TODO: implement compatibility check with opt_feature_extract
+    @staticmethod
+    def model_tf_v1(n_input, n_output, opt_feature_extract):
+        """
+
+        Initialize the tensorflow 1.1X version of the model
+
+        :param int n_input: number of input dimensions (number of ECG + aux channels)
+        :param int n_output: number of output (number of EEG channels)
+        :param object opt_feature_extract: option object from feature extraction step
+
+        :return: initialized model
+        """
         from tensorflow.python.keras.layers import Input, Bidirectional, CuDNNGRU, Dense, Dropout
 
         session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
         sess = tf.Session(config=session_config)
 
         K.set_floatx('float64')
-        ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
+        ecg_input = Input(shape=(None, n_input), dtype='float64', name='ecg_input')
 
         x = Bidirectional(CuDNNGRU(16, return_sequences=True,
-                                   recurrent_regularizer=regularizers.l2(0.096),
-                                   activity_regularizer=regularizers.l2(0.030)))(ecg_input)
+                                   recurrent_regularizer=l2(0.096),
+                                   activity_regularizer=l2(0.030)))(ecg_input)
 
         x = Bidirectional(CuDNNGRU(16, return_sequences=True,
-                                   recurrent_regularizer=regularizers.l2(0.090),
-                                   activity_regularizer=regularizers.l2(0.013)))(x)
+                                   recurrent_regularizer=l2(0.090),
+                                   activity_regularizer=l2(0.013)))(x)
 
         x = Dense(8, activation='relu')(x)
         x = Dropout(0.327)(x)
 
         x = Bidirectional(CuDNNGRU(16, return_sequences=True,
-                                   recurrent_regularizer=regularizers.l2(0.024),
-                                   activity_regularizer=regularizers.l2(0.067)))(x)
+                                   recurrent_regularizer=l2(0.024),
+                                   activity_regularizer=l2(0.067)))(x)
 
         x = Bidirectional(CuDNNGRU(64, return_sequences=True,
-                                   recurrent_regularizer=regularizers.l2(2.48e-07),
-                                   activity_regularizer=regularizers.l2(0.055)))(x)
+                                   recurrent_regularizer=l2(2.48e-07),
+                                   activity_regularizer=l2(0.055)))(x)
 
-        bcg_out = Dense(63, activation='linear')(x)
+        bcg_out = Dense(n_output, activation='linear')(x)
         model = Model(inputs=ecg_input, outputs=bcg_out)
-
-        model.compile(loss='mean_squared_error', optimizer='adam')
-        model.summary()
 
         return model
 
+    def compile_model(self, optimizer=None, loss='mean_squared_error', **kwargs):
+        """
+        Compile the model based on optional provided optimizer and loss metric
 
+        :param tensorflow.python.keras.optimizers optimizer: optional provided optimizer if wish to use type different
+            from the default
+        :param str loss: type of loss metric used
+        :param kwargs: additional arguments that are accepted by keras compile function
 
+        """
+
+        if optimizer is not None:
+            self.optimizer = optimizer
+
+        self.model.compile(optimizer=self.optimizer, loss=loss, **kwargs)
+        self.model.summary()
 
 
 if __name__ == '__main__':
     """ used for debugging """
 
-    model = rnn_model(lr=0.01, opt_type='adam')
-    model.model()
+    model = rnn_model(lr=0.01, n_input=1, n_output=63, opt_type='adam')
+    model.init_model()
+    model.compile_model()
+
+    print('nothing')
