@@ -1,6 +1,8 @@
+# TODO: modify the import statement in the final version
+
 import scipy.stats as stats
 from utils.context_management import suppress_stdout
-from settings import rs_path
+from settings import rs_path, get_str_proc
 import numpy as np
 import mne
 import settings
@@ -8,7 +10,8 @@ from datetime import datetime
 from options import test_opt
 
 
-def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_motion_data):
+# TODO: clean up the return arguments later
+def preprocessing(dataset_dir, duration, threshold, new_fs):
     """
     Performs all the preprocessing for the data in the RNN processing pipeline
 
@@ -18,39 +21,37 @@ def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_mot
 
     NOTE: here there is no need to pad the data since for RNN the output has the same shape as the input
 
-    :param dataset_dir: pathlib.Path object pointing to the source, which is a EEGlab format containing a single run
+    :param str dataset_dir: pathlib.Path object pointing to the source, which is a EEGlab format containing a single run
         from a single subject of shape (64, n_time_stamps)
-    :param duration: duration of each epoch
-    :param threshold: multiples of mean absolute deviation (MAD) within each epoch for thresholding outliers
-    :param n_downsampling: factor of downsampling, if 1 then no downsampling is performed
-    :param flag_use_motion_data: flag for whether or not motion data was used
+    :param int duration: duration of each epoch in seconds
+    :param int threshold: multiples of mean absolute deviation (MAD) within each epoch for thresholding outliers
+    :param int new_fs: new sampling rate; if same as original sampling rate then no resampling is performed
 
-    :return: normalized_epoched_raw_dataset: mne.EpochArray object containing the whitened epoched data
-    :return: normalized_raw_dataset: mne Raw object with whitened data
-    :return: epoched_raw_dataset: mne.EpochArray object containing the raw epoched data
-    :return: raw_dataset: mne.RawArray object with raw data
-    :return: orig_sr_epoched_raw_dataset: mne.EpochArray object with data epoched using raw data with original
+    :return: mne.EpochArray normalized_epoched_raw_dataset: mne.EpochArray object containing the whitened epoched data
+    :return: mne.RawArray normalized_raw_dataset: mne.RawArray object with whitened data
+    :return: mne.EpochArray epoched_raw_dataset: mne.EpochArray object containing the raw epoched data
+    :return: mne.RawArray raw_dataset: mne.RawArray object with raw data
+    :return: mne.EpochArray orig_sr_epoched_raw_dataset: mne.EpochArray object with data epoched using raw data with original
         sampling rate
-    :return: orig_sr_raw_dataset: mne.RawArray object with raw data where downsampling is not performed
-    :return: ecg_stats: list containing the mean and std for the ECG channel, shape (1, 2)
-    :return: eeg_stats: list containing the mean and std for the EEG channels, shape (63, 2)
-    :return: good_idx: list containing the epochs that passed the epoch rejection, used later in prediction step
+    :return: mne.RawArray orig_sr_raw_dataset: mne.RawArray object with raw data where downsampling is not performed
+    :return: list ecg_stats: list containing the mean and std for the ECG channel, shape (1, 2)
+    :return: list eeg_stats: list containing the mean and std for the EEG channels, shape (63, 2)
+    :return: list good_idx: list containing the epochs that passed the epoch rejection, used later in prediction step
     """
 
     print('\n\nStarting to load the data\n')
     # Loading the raw input in EEGLAB format and downsampling it
-    raw_dataset = mne.io.read_raw_eeglab(dataset_dir, preload=True, stim_channel=False)
+    raw_dataset = mne.io.read_raw_eeglab(dataset_dir, preload=True)
+    orig_fs = raw_dataset.info['sfreq']
 
-    if n_downsampling != 1:
-        fs_orig = raw_dataset.info['sfreq']
-        fs = fs_orig / n_downsampling
-        raw_dataset.resample(fs)
+    if new_fs != float(orig_fs):
+        raw_dataset.resample(new_fs)
 
     # Load the raw dataset again but don't downsample it this time
-    orig_sr_raw_dataset = mne.io.read_raw_eeglab(dataset_dir, preload=True, stim_channel=False)
+    orig_sr_raw_dataset = mne.io.read_raw_eeglab(dataset_dir, preload=True)
 
-    # Get rid of the motion data channels if flag not set to true
-    if not flag_use_motion_data:
+    # TODO: delete the following snippet (since the user doesn't have any motion data)
+    if get_str_proc() == 'proc_full':
         raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
         orig_sr_raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
 
@@ -77,7 +78,7 @@ def preprocessing(dataset_dir, duration, threshold, n_downsampling, flag_use_mot
            orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, ecg_stats, eeg_stats, good_idx
 
 
-def preprocessing_mr(str_sub, vec_run_id, duration, threshold, n_downsampling, flag_use_motion_data):
+def preprocessing_mr(str_sub, vec_run_id, duration, threshold, new_fs):
     """
     Wrapper function using the preprocessing function for single runs to load multiple runs from the same subject
 
@@ -85,8 +86,7 @@ def preprocessing_mr(str_sub, vec_run_id, duration, threshold, n_downsampling, f
     :param vec_run_id: list containing the indices for al the runs to be analyzed
     :param duration: duration of each epoch
     :param threshold: multiples of mean absolute deviation (MAD) within each epoch for thresholding outliers
-    :param n_downsampling: factor of downsampling, if 1 then no downsampling is performed
-    :param flag_use_motion_data: flag for whether or not motion data was used
+    :param new_fs: factor of downsampling, if 1 then no downsampling is performed
 
     :return: vec_normalized_epoched_raw_dataset: list containing mne.EpochArray objects where each object contains
         the whitened epoched data from a single run
@@ -131,8 +131,7 @@ def preprocessing_mr(str_sub, vec_run_id, duration, threshold, n_downsampling, f
         orig_sr_epoched_raw_dataset, orig_sr_raw_dataset, \
         ecg_stats, eeg_stats, good_idx = preprocessing(dataset_dir=pfe_rs, duration=duration,
                                                        threshold=threshold,
-                                                       n_downsampling=n_downsampling,
-                                                       flag_use_motion_data=flag_use_motion_data)
+                                                       new_fs=new_fs)
 
         vec_normalized_epoched_raw_dataset.append(normalized_epoched_raw_dataset)
         vec_normalized_raw_dataset.append(normalized_raw_dataset)
@@ -438,8 +437,7 @@ def preprocess_subject(str_sub, vec_run_id, opt_user=test_opt(None)):
                                                    vec_run_id=vec_run_id,
                                                    duration=opt_user.epoch_duration,
                                                    threshold=opt_user.mad_threshold,
-                                                   n_downsampling=opt_user.n_downsampling,
-                                                   flag_use_motion_data=opt_user.use_motion_data)
+                                                   new_fs=opt_user.new_fs)
 
     return vec_normalized_epoched_raw_dataset, vec_normalized_raw_dataset, vec_epoched_raw_dataset, \
            vec_raw_dataset, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_raw_dataset, vec_ecg_stats, \

@@ -1,6 +1,5 @@
 import mne
 import glob
-import set_env
 import os
 import sys
 from contextlib import contextmanager
@@ -61,7 +60,9 @@ def single_subject_mabs(dataset, threshold):
 
 
 if __name__ == '__main__':
-    p_rs, f_rs = set_env.rs_path('sub11', 1)
+    import settings
+
+    p_rs, f_rs = settings.rs_path('sub11', 1)
     p_rs = p_rs.parents[0]
     vec_filename = glob.glob(str(p_rs / '**/sub*_r0[1-5]_rs.set'), recursive=True)
 

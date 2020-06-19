@@ -139,3 +139,8 @@ def rs_path(str_sub, run_id):
     p_rs = p_data / str_experiment / str_proc / str_proc_rs / str_sub
     f_rs = '{}_r0{}_rs.set'.format(str_sub, run_id)
     return p_rs, f_rs
+
+
+# TODO: delete this in the final version
+def get_str_proc():
+    return str_proc

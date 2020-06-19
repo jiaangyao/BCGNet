@@ -8,7 +8,7 @@ def test_opt(opt):
     Processing parameters:
     _epoch_duration: duration in seconds of each time epoch to split the data into: float
     _mad_threshold: multiples of the median absolute deviation for outlier tests to reject the time epochs: float
-    __n_downsampling: factor of downsampling during the preprocessing: int
+    __int: new_fs: new sampling rate
 
     Training parameters:
     _epochs: number of epochs: int
@@ -48,10 +48,10 @@ def test_opt(opt):
         # Processing parameters
         opt.epoch_duration = 3
         opt.mad_threshold = 5
-        opt.n_downsampling = 5
+        opt.new_fs = 100
 
         # Training parameters
-        opt.epochs = 2500
+        opt.epochs = 3
         opt.training = 0.70
         opt.validation = 0.15
         opt.batch_size = 1
