@@ -2,10 +2,10 @@ import tensorflow as tf
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras import backend as K
 
-from bcg_net_architecture.default_models import rnn_model
+from bcg_net_architecture.default_models import RNNModel
 
 
-class gru_arch_000(rnn_model):
+class gru_arch_000(RNNModel):
     def __init__(self, n_input=1, n_output=63, lr=1e-2, opt_type='adam', opt_feature_extract=None, **kwargs):
         """
         See documentation of rnn_model in default_models

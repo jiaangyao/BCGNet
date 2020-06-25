@@ -58,6 +58,7 @@ def predict_time_series(model, callbacks_, normalized_raw_dataset, raw_dataset, 
     ECG_data = renormalize(normalized_ECG_data, ecg_stats, flag_multi_ch=False, flag_time_series=True)
     clenaed_EEG_data = renormalize(normalized_cleaned_EEG_data, eeg_stats, flag_multi_ch=True, flag_time_series=True)
 
+    # TODO: don't think we need this anymore
     # Check if the normalization is performed normally
     ECG_data_orig = raw_dataset.get_data()[ecg_ch, :].reshape(1, raw_dataset.get_data().shape[1], 1)
     if not np.allclose(ECG_data, ECG_data_orig):

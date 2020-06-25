@@ -6,7 +6,7 @@ from tensorflow.python.keras import backend as K
 import os
 
 
-class nn_model:
+class NNModel:
     def __init__(self):
         self.name = None
         self.model = None
@@ -37,7 +37,7 @@ class nn_model:
         self.model.trainable = True
 
 
-class rnn_model(nn_model):
+class RNNModel(NNModel):
     def __init__(self, n_input=1, n_output=63, lr=1e-2, opt_type='adam', opt_feature_extract=None, **kwargs):
         """
         Constructor for RNN model
@@ -223,7 +223,7 @@ class rnn_model(nn_model):
 if __name__ == '__main__':
     """ used for debugging """
 
-    model = rnn_model(lr=0.01, n_input=1, n_output=63, opt_type='adam')
+    model = RNNModel(lr=0.01, n_input=1, n_output=63, opt_type='adam')
     model.init_model()
     model.compile_model()
 

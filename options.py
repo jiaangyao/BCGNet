@@ -1,6 +1,7 @@
 from utils.options_default import *
 
 
+# TODO: reorganize the configuration into dictionary
 def test_opt(opt):
     """
     Class used for initializing hyperparameters of the training

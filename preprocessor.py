@@ -1,4 +1,4 @@
-# TODO: modify the import statement in the final version
+# TODO: modify the import statement in the final version (get rid of get_str_proc)
 
 import scipy.stats as stats
 from utils.context_management import suppress_stdout
@@ -11,6 +11,18 @@ from options import test_opt
 
 
 # TODO: clean up the return arguments later
+"""
+temp note:
+normalized epoched raw is used for training the model
+normalized raw is used for prediction
+epoched raw is not used...
+raw is used for verifying the renormalization (can be removed)
+orig sr epoched raw is used for final comparison (comparing with raw data)
+orig sr raw is used for interpolation
+
+"""
+
+
 def preprocessing(dataset_dir, duration, threshold, new_fs):
     """
     Performs all the preprocessing for the data in the RNN processing pipeline
@@ -21,19 +33,19 @@ def preprocessing(dataset_dir, duration, threshold, new_fs):
 
     NOTE: here there is no need to pad the data since for RNN the output has the same shape as the input
 
-    :param str dataset_dir: pathlib.Path object pointing to the source, which is a EEGlab format containing a single run
-        from a single subject of shape (64, n_time_stamps)
+    :param str dataset_dir: string converted from pathlib.Path object pointing to the source, which is a EEGlab format
+        containing a single run from a single subject of shape (64, n_time_stamps)
     :param int duration: duration of each epoch in seconds
     :param int threshold: multiples of mean absolute deviation (MAD) within each epoch for thresholding outliers
     :param int new_fs: new sampling rate; if same as original sampling rate then no resampling is performed
 
-    :return: mne.EpochArray normalized_epoched_raw_dataset: mne.EpochArray object containing the whitened epoched data
-    :return: mne.RawArray normalized_raw_dataset: mne.RawArray object with whitened data
-    :return: mne.EpochArray epoched_raw_dataset: mne.EpochArray object containing the raw epoched data
-    :return: mne.RawArray raw_dataset: mne.RawArray object with raw data
-    :return: mne.EpochArray orig_sr_epoched_raw_dataset: mne.EpochArray object with data epoched using raw data with original
-        sampling rate
-    :return: mne.RawArray orig_sr_raw_dataset: mne.RawArray object with raw data where downsampling is not performed
+    :return: mne.EpochsArray normalized_epoched_raw_dataset: mne.EpochArray object containing the whitened epoched data
+    :return: mne.io.RawArray normalized_raw_dataset: mne.RawArray object with whitened data
+    :return: mne.EpochsArray epoched_raw_dataset: mne.EpochArray object containing the raw epoched data
+    :return: mne.io.RawArray raw_dataset: mne.RawArray object with raw data
+    :return: mne.EpochsArray orig_sr_epoched_raw_dataset: mne.EpochArray object with data epoched using raw data with
+        original sampling rate
+    :return: mne.io.RawArray orig_sr_raw_dataset: mne.RawArray object with raw data where downsampling is not performed
     :return: list ecg_stats: list containing the mean and std for the ECG channel, shape (1, 2)
     :return: list eeg_stats: list containing the mean and std for the EEG channels, shape (63, 2)
     :return: list good_idx: list containing the epochs that passed the epoch rejection, used later in prediction step
