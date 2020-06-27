@@ -2,6 +2,7 @@
 Directory structure
 """
 from pathlib import Path
+import subprocess
 
 
 class GitLabel():

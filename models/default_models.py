@@ -12,17 +12,6 @@ class NNModel:
         self.model = None
         self.optimizer = None
 
-    @staticmethod
-    def get_name():
-        """
-        Get the name of the arch.
-
-        :return: The name of the arch.
-        """
-        filename = os.path.basename(__file__)
-        return os.path.splitext(filename)[0]
-
-    @staticmethod
     def init_model(self):
         raise NotImplementedError
 
@@ -56,7 +45,7 @@ class RNNModel(NNModel):
 
         """
         super().__init__()
-        self.name = self.get_name()
+        self.name = 'default_rnn_model'
         self.lr = lr
         self.opt_type = opt_type.lower()
         self.n_input = n_input

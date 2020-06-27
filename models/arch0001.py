@@ -4,7 +4,7 @@ from tensorflow.python.keras import backend as K
 import os
 
 """
-Called with bcg_net_architecture.arch0001.create_arch(blah)
+Called with models.arch0001.create_arch(blah)
 """
 
 

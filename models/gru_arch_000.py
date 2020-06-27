@@ -2,7 +2,8 @@ import tensorflow as tf
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras import backend as K
 
-from bcg_net_architecture.default_models import RNNModel
+from models.default_models import RNNModel
+from os.path import basename, splitext
 
 
 class gru_arch_000(RNNModel):
@@ -13,6 +14,8 @@ class gru_arch_000(RNNModel):
 
         """
         super(gru_arch_000, self).__init__(n_input, n_output, lr, opt_type, opt_feature_extract, **kwargs)
+
+        self.name = splitext(basename(__file__))[0]
 
     """
     Depending on whether the user has tensorflow 2.X or 1.1X installed on their computer, they can modify the following

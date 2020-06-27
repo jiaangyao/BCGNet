@@ -17,7 +17,7 @@ class DefaultDataset:
         """
         Load in the dataset and resample if needed
 
-        :param pathlib.Path d_input: pathlib object containing absolute path to the object
+        :param pathlib.Path d_input: pathlib object containing absolute path to the single run of data
         :param int new_fs: (optional) new desired sampling rate
         :param object cfg: configuration
 
