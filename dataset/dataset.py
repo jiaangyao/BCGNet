@@ -2,6 +2,7 @@ import mne
 import numpy as np
 from scipy.stats import median_absolute_deviation
 from settings import get_str_proc
+from utils import temp_seed
 
 """
 Each dataset object contains a single run of data from a single subject loaded by mne
@@ -11,7 +12,8 @@ Each dataset object contains a single run of data from a single subject loaded b
 class DefaultDataset:
     # TODO: check whether cfg is correctly used here and if it's correctly documented in the docstring
     # TODO: obtain the fields from the cfg object
-    def __init__(self, d_input, len_epoch=3, mad_threshold=5, new_fs=None, cfg=None):
+    def __init__(self, d_input, len_epoch=3, mad_threshold=5, new_fs=None, per_training=0.7, per_valid=0.15,
+                 per_test=0.15, random_seed=1997, cv_mode=False, num_fold=None, cfg=None):
         """
         Load in the dataset and resample if needed
 
@@ -35,6 +37,30 @@ class DefaultDataset:
         self.epoched_standardized_dataset = None
         self.epoch_rejected = False
         self.vec_idx_good_epochs = None
+
+        if per_training + per_valid + per_test > 1:
+            raise RuntimeError("Total percentage greater than 1")
+
+        self.per_training = per_training
+        self.per_valid = per_valid
+        self.per_test = per_test
+        self.random_seed = random_seed
+
+        self.cv_mode = cv_mode
+        if cv_mode:
+            self.vec_xs = None
+            self.vec_ys = None
+            self.mat_idx_slice = None
+
+            if cv_mode is not None:
+                self.num_fold = num_fold
+            else:
+                self.num_fold = int(np.round(1 / self.per_test))
+
+        else:
+            self.xs = None
+            self.ys = None
+            self.vec_idx_slice = None
 
         # Resample if needed
         if new_fs is not None:
@@ -229,6 +255,37 @@ class DefaultDataset:
         return epoched_dataset
 
     @staticmethod
+    def _perform_epoch_rejection(epoched_dataset, mad_threshold):
+        """
+        Function for performing the mean absolute deviation (MAD) based epoch rejection
+
+        :param mne.Epochs epoched_dataset: object holding epoched dataset for which MAD-based epoch rejection is
+            to be performed
+        :param int mad_threshold: # times the mean absolute deviation to set the threshold for MAD-based epoch rejection
+
+        :return: indices of epochs that passed the epoch rejection test
+        """
+
+        # note that abs_epoched_data is of shape (n_epochs, n_channel, n_sample)
+        abs_epoched_data = np.absolute(epoched_dataset.get_data())
+        info = epoched_dataset.info
+        ecg_ch = info['ch_names'].index('ECG')
+        target_ch = np.delete(np.arange(0, len(info['ch_names']), 1), ecg_ch)
+
+        # Compute the ratio of each epoch's absolute value across all channels over its MAD
+        vec_mabs_eeg = np.mean(abs_epoched_data[:, target_ch, :], axis=(1, 2))
+        vec_eeg_norm = (vec_mabs_eeg - np.median(vec_mabs_eeg)) / median_absolute_deviation(vec_mabs_eeg)
+
+        # If the ratio is higher than the threshold then the epoch is rejected
+        vec_idx_bad_epochs = np.arange(0, len(vec_eeg_norm), 1)[vec_eeg_norm > mad_threshold]
+        vec_idx_good_epochs = np.delete(np.arange(0, epoched_dataset.get_data().shape[0], 1), vec_idx_bad_epochs)
+
+        print("\nRejecting {} epochs out of a total of {}".format(len(vec_idx_bad_epochs), abs_epoched_data.shape[0]))
+        print("{} epochs remaining...\n".format(len(vec_idx_good_epochs)))
+
+        return vec_idx_good_epochs
+
+    @staticmethod
     def _construct_epoch_events(len_recording, fs, len_epoch):
         """
         Create events of fixed duration apart to split the original time series into time windows (epochs) of equal
@@ -261,39 +318,221 @@ class DefaultDataset:
 
         return constructed_events, tmax
 
+    def split_dataset(self):
+        if not self.cv_mode:
+            self.xs, self.ys, \
+                self.vec_idx_slice = DefaultDataset._generate_train_valid_test(self.epoched_standardized_dataset,
+                                                                               self.per_training, self.per_valid,
+                                                                               self.random_seed)
+
+        else:
+            self.vec_xs, self.vec_ys, \
+                self.mat_idx_slice = DefaultDataset._generate_train_valid_test_cv(self.epoched_standardized_dataset,
+                                                                                  self.per_valid, self.num_fold,
+                                                                                  self.random_seed)
+
+    # TODO: fix the documentation
     @staticmethod
-    def _perform_epoch_rejection(epoched_dataset, mad_threshold):
+    def _generate_train_valid_test(epoched_dataset, per_training, per_valid, random_seed):
         """
-        Function for performing the mean absolute deviation (MAD) based epoch rejection
+        Generate the training, validation and test epoch data from the MNE Epoch object based on the training set
+            ratio and validation set ratio and random seed provided
 
-        :param mne.Epochs epoched_dataset: object holding epoched dataset for which MAD-based epoch rejection is
-            to be performed
-        :param int mad_threshold: # times the mean absolute deviation to set the threshold for MAD-based epoch rejection
+        :param mne.EpochsArray epoched_dataset: object where epoched_dataset.get_data() is the  normalized
+            epoched data and is of the form of (epoch, channel, data)
+        :param float per_training: percentage of training set epochs
+        :param float per_valid: percentage of validation set epochs
+        :param int random_seed: random seed used for the splitting of the dataset
 
-        :return: indices of epochs that passed the epoch rejection test
+        :return:
+
+
+        :return: xs: list containing all the ECG data in the form of [x_train, x_validation, x_test], where each element
+            is of the form (epoch, channel, data)
+        :return: ys: list containing all the corrupted EEG data in the form of [y_train, y_validation, y_test], where each
+            element is of the form (epoch, channel, data)
+        :return: vec_ix_slice: list in the form of [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test],
+            where each element contains the indices of epochs in the original dataset belonging to the training, validation
+            and test set respectively
         """
 
-        # note that abs_epoched_data is of shape (n_epochs, n_channel, n_sample)
-        abs_epoched_data = np.absolute(epoched_dataset.get_data())
-        info = epoched_dataset.info
-        ecg_ch = info['ch_names'].index('ECG')
-        target_ch = np.delete(np.arange(0, len(info['ch_names']), 1), ecg_ch)
+        # Obtain the data and the index of the ECG channel from the MNE Epoch object
+        # Note that normalized_data is in the form (epoch, channel, data)
+        epoched_data = epoched_dataset.get_data()
+        ch_ecg = epoched_dataset.info['ch_names'].index('ECG')
 
-        # Compute the ratio of each epoch's absolute value across all channels over its MAD
-        vec_mabs_eeg = np.mean(abs_epoched_data[:, target_ch, :], axis=(1, 2))
-        vec_eeg_norm = (vec_mabs_eeg - np.median(vec_mabs_eeg)) / median_absolute_deviation(vec_mabs_eeg)
+        # Obtain the total number of epochs
+        num_epochs = epoched_data.shape[0]
 
-        # If the ratio is higher than the threshold then the epoch is rejected
-        vec_idx_bad_epochs = np.arange(0, len(vec_eeg_norm), 1)[vec_eeg_norm > mad_threshold]
-        vec_idx_good_epochs = np.delete(np.arange(0, epoched_dataset.get_data().shape[0], 1), vec_idx_bad_epochs)
+        # Temporarily set the random seed so that the data will be split in the same way
+        with temp_seed(random_seed):
+            # compute the number of epochs in each set
+            num_training = int(np.round(num_epochs * per_training))
+            num_valid = int(np.round(num_epochs * per_valid))
 
-        print("\nRejecting {} epochs out of a total of {}".format(len(vec_idx_bad_epochs), abs_epoched_data.shape[0]))
-        print("{} epochs remaining...\n".format(len(vec_idx_good_epochs)))
+            # now compute the indices
+            vec_idx = np.random.permutation(num_epochs)
+            vec_idx_training = vec_idx[:num_training]
+            vec_idx_valid = vec_idx[num_training: num_training + num_valid]
+            vec_idx_test = vec_idx[num_training + num_valid:]
 
-        return vec_idx_good_epochs
+            # test for overlap
+            overlap_1 = np.intersect1d(vec_idx_training, vec_idx_valid)
+            overlap_2 = np.intersect1d(vec_idx_valid, vec_idx_test)
+            overlap_3 = np.intersect1d(vec_idx_training, vec_idx_test)
+            if len(overlap_1) > 0 or len(overlap_2) > 0 or len(overlap_3) > 0:
+                raise RuntimeError("Overlap between training, validation and test sets")
+
+            # obtain the epochs in each set
+            epoched_data_training = epoched_data[vec_idx_training, :, :]
+            epocehd_data_valid = epoched_data[vec_idx_valid, :, :]
+            epocehd_data_test = epoched_data[vec_idx_test, :, :]
+
+            # Obtain the ECG data in each set
+            x_train = epoched_data_training[:, ch_ecg, :]
+            x_validation = epocehd_data_valid[:, ch_ecg, :]
+            x_test = epocehd_data_test[:, ch_ecg, :]
+
+            # Obtain the EEG data in each set
+            y_train = np.delete(epoched_data_training, ch_ecg, axis=1)
+            y_validation = np.delete(epocehd_data_valid, ch_ecg, axis=1)
+            y_test = np.delete(epocehd_data_test, ch_ecg, axis=1)
+
+        # Package everything together into a list
+        xs = [x_train, x_validation, x_test]
+        ys = [y_train, y_validation, y_test]
+        vec_idx_slice = [vec_idx_training, vec_idx_valid, vec_idx_test]
+
+        return xs, ys, vec_idx_slice
+
+    # TODO: fix the documentation
+    @staticmethod
+    def _generate_train_valid_test_cv(epoched_dataset, per_valid, num_fold, random_seed):
+        """
+        Generate the training, validation and test epoch data from the MNE Epoch object based on the number of folds
+            (related to test set ratio) and validation set ratio and random seed provided in a cross validation manner
+
+        :param mne.EpochsArray epoched_dataset: object where epoched_dataset.get_data() is the  normalized
+            epoched data and is of the form of (epoch, channel, data)
+        :param float per_valid: percentage of validation set epochs
+        :param int num_fold: number of cross validation folds
+        :param int random_seed: random seed used for the splitting of the dataset
+
+
+        :return: vec_xs: list containing all the ECG data in the form of [fold1, fold2, ...], where each fold is in the form
+            of [x_train, x_validation, x_test] and each element is of the form (epoch, data)
+        :return: vec_ys: list containing all the corrupted EEG data in the form of [fold1, fold2, ...] where each fold is
+            in the form [y_train, y_validation, y_test] and each element is of the form (epoch, channel, data)
+        :return: mat_ix_slice: list in the form of [fold1, fold2, ...], where each fold is of the form of
+            [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test], where each element contains the indices of
+            epochs in the original dataset belonging to the training, validation and test set respectively
+        """
+
+        # Obtain the data and the index of the ECG channel from the MNE Epoch object
+        # Note that normalized_data is in the form (epoch, channel, data)
+        epoched_data = epoched_dataset.get_data()
+        ch_ecg = epoched_dataset.info['ch_names'].index('ECG')
+
+        # Obtain the total number of epochs
+        num_epochs = epoched_data.shape[0]
+
+        # Temporarily set the random seed so that the data will be split in the same way
+        with temp_seed(random_seed):
+            # Split everything into int(ceil(1/per_fold)) number of folds of roughly equal sizes
+            vec_idx_epoch = np.random.permutation(num_epochs)
+            mat_idx_slice_test = np.array_split(vec_idx_epoch, num_fold)
+
+            # Define the empty arrays to hold the variables
+            mat_idx_slice = []
+            vec_xs = []
+            vec_ys = []
+
+            # Loop through each fold and determine the validation set and training set for each fold according to
+            # defined percentages
+            for i in range(len(mat_idx_slice_test)):
+                vec_idx_test = mat_idx_slice_test[i]
+                if not np.all(np.isin(vec_idx_test, vec_idx_epoch)):
+                    raise Exception('Erroneous CV fold splitting')
+                epocehd_data_test = epoched_data[vec_idx_test, :, :]
+
+                # Obtain the indices that correspond to training + validation set and permute it
+                vec_idx_tv = np.setdiff1d(vec_idx_epoch, vec_idx_test)
+                permuted_vec_tv = vec_idx_tv[np.random.permutation(len(vec_idx_tv))]
+
+                # Obtain the validation epochs
+                num_valid = int(np.round(num_epochs * per_valid))
+                vec_idx_valid = permuted_vec_tv[:num_valid]
+                epocehd_data_valid = epoched_data[vec_idx_valid, :, :]
+
+                # Obtain the training epochs
+                vec_idx_training = vec_idx_tv[num_valid:]
+                epocehd_data_training = epoched_data[vec_idx_training, :, :]
+
+                # test for overlap
+                overlap_1 = np.intersect1d(vec_idx_training, vec_idx_valid)
+                overlap_2 = np.intersect1d(vec_idx_valid, vec_idx_test)
+                overlap_3 = np.intersect1d(vec_idx_training, vec_idx_test)
+                if len(overlap_1) > 0 or len(overlap_2) > 0 or len(overlap_3) > 0:
+                    raise RuntimeError("Overlap between training, validation and test sets")
+
+                # Obtain the xs and the ys
+                x_training = epocehd_data_training[:, ch_ecg, :]
+                x_validation = epocehd_data_valid[:, ch_ecg, :]
+                x_test = epocehd_data_test[:, ch_ecg, :]
+
+                y_training = np.delete(epocehd_data_training, ch_ecg, axis=1)
+                y_validation = np.delete(epocehd_data_valid, ch_ecg, axis=1)
+                y_test = np.delete(epocehd_data_test, ch_ecg, axis=1)
+
+                # Package everything into a single list
+                xs = [x_training, x_validation, x_test]
+                ys = [y_training, y_validation, y_test]
+                vec_idx_slice = [vec_idx_training, vec_idx_valid, vec_idx_training]
+
+                # Append those to the outer lists holding everything
+                vec_xs.append(xs)
+                vec_ys.append(ys)
+                mat_idx_slice.append(vec_idx_slice)
+
+        return vec_xs, vec_ys, mat_idx_slice
 
     def evaluate_dataset(self):
         pass
+
+    # TODO: fix this later
+    @staticmethod
+    def _split_epoched_dataset(epoched_dataset, vec_ix_slice):
+        """
+        Split the mne.io_ops.Mne object holding the cleaned EEG data into the same set of training, validation and test
+        epochs as during the training
+
+        :param epoched_dataset: mne.io_ops.Mne object that holds the epoched data, note that the data held has the form
+            (epoch, channel, data)
+        :param vec_ix_slice: list in the form of [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test],
+            where each element contains the indices of epochs in the original dataset belonging to the training, validation
+            and test set respectively
+
+        :return: vec_epoched_dataset_set: list in the form of [epoched_dataset_training, epoched_dataset_validation,
+            epoched_dataset_test], where each is an mne.io_ops.Mne object that holds epoched data belonging to the specified set
+            during training
+        """
+
+        # Get the data and info object first
+        epoched_data = epoched_dataset.get_data()
+        info = epoched_dataset.info
+
+        # Get the training, validation and test data
+        epoched_data_training = epoched_data[vec_ix_slice[0], :, :]
+        epoched_data_validation = epoched_data[vec_ix_slice[1], :, :]
+        epoched_data_test = epoched_data[vec_ix_slice[2], :, :]
+
+        epoched_dataset_training = mne.EpochsArray(epoched_data_training, info)
+        epoched_dataset_validation = mne.EpochsArray(epoched_data_validation, info)
+        epoched_dataset_test = mne.EpochsArray(epoched_data_test, info)
+
+        vec_epoched_dataset_set = [epoched_dataset_training, epoched_dataset_validation, epoched_dataset_test]
+
+        return vec_epoched_dataset_set
 
 
 if __name__ == '__main__':
@@ -305,5 +544,6 @@ if __name__ == '__main__':
     d_ga_removed = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_rs/sub11/sub11_r01_rs.set')
     dataset = DefaultDataset(d_ga_removed, new_fs=500)
     dataset.prepare_dataset()
+    dataset.split_dataset()
 
     print('nothing')
