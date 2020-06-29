@@ -14,7 +14,7 @@ settings.init(Path.home(), Path.home())  # Call only once
 
 # Parameters
 str_sub = 'sub11'
-vec_run_id = [1, 2]
+vec_run_id = [1, 2, 3, 4, 5]
 opt = options.test_opt(None)
 str_arch = 'gru_arch_general4'
 

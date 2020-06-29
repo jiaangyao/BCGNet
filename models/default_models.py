@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tensorflow.python.keras import callbacks, optimizers
+from tensorflow.python.keras import optimizers
 from tensorflow.python.keras.models import Model
 from tensorflow.python.keras.regularizers import l2
 from tensorflow.python.keras import backend as K
@@ -26,8 +26,9 @@ class NNModel:
         self.model.trainable = True
 
 
+# TODO: get rid of the feature extract opt
 class RNNModel(NNModel):
-    def __init__(self, n_input=1, n_output=63, lr=1e-2, opt_type='adam', opt_feature_extract=None, **kwargs):
+    def __init__(self, n_input=1, n_output=63, lr=1e-3, opt_type='adam', opt_feature_extract=None, **kwargs):
         """
         Constructor for RNN model
 
@@ -51,6 +52,8 @@ class RNNModel(NNModel):
         self.n_input = n_input
         self.n_output = n_output
         self.opt_feature_extract = opt_feature_extract
+
+        K.set_floatx('float64')
 
         if opt_type.lower() == 'adam':
             self.optimizer = optimizers.Adam(lr=lr, **kwargs)
@@ -201,6 +204,7 @@ class RNNModel(NNModel):
         :param kwargs: additional arguments that are accepted by keras compile function
 
         """
+        K.set_floatx('float64')
 
         if optimizer is not None:
             self.optimizer = optimizer

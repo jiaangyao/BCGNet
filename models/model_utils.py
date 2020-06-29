@@ -12,7 +12,7 @@ def update_init(dest_dir):
     if "__init__" in vec_f_file:
         vec_f_file.remove("__init__")
 
-    with open('__init__.py', 'w') as f:
+    with open(dest_dir / '__init__.py', 'w') as f:
         for f_file in vec_f_file:
             f.write("from models.{} import *\n".format(f_file))
 
