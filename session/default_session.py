@@ -5,7 +5,7 @@ from dataset import DefaultDataset
 from models import update_init
 from utils import temp_seed
 from session import DefaultGenerator
-from tensorflow.python.keras import callbacks
+from tensorflow.keras import callbacks
 
 # TODO: finish all documentation
 
@@ -13,7 +13,7 @@ from tensorflow.python.keras import callbacks
 class DefaultSession:
     # TODO: figure out d_data from cfg
     def __init__(self, d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch,
-                 batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5,
+                 lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5,
                  cv_mode=False, random_seed=1997, cfg=None):
         self.cfg = cfg
 
@@ -26,6 +26,7 @@ class DefaultSession:
         self.vec_idx_run = vec_idx_run
         self.str_arch = str_arch
 
+        self.lr = lr
         self.batch_size = batch_size
         self.num_epochs = num_epochs
         self.es_patience = es_patience
@@ -86,7 +87,7 @@ class DefaultSession:
     def prepare_training(self):
         if not self.cv_mode:
 
-            self.session_model = self._init_model(self.d_root, self.str_arch)
+            self.session_model = self._init_model(d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
             self.session_model.init_model()
             self.session_model.compile_model()
 
@@ -107,7 +108,7 @@ class DefaultSession:
             pass
 
     @staticmethod
-    def _init_model(d_root, str_arch=None):
+    def _init_model(d_root, str_arch=None, lr=1e-3):
         # update the init model in the models directory
         d_models = d_root / 'models'
         update_init(d_models)
@@ -115,7 +116,7 @@ class DefaultSession:
         if str_arch is None:
             from models import RNNModel
 
-            model = RNNModel()
+            model = RNNModel(lr=lr)
 
             return model
 
@@ -125,16 +126,18 @@ class DefaultSession:
 
             warnings.warn("Specified model not found, initialize default model instead", RuntimeWarning)
 
-            model = RNNModel()
+            model = RNNModel(lr=lr)
 
             return model
 
         elif (d_models / "{}.py".format(str_arch)).exists() is True:
             try:
+                import importlib
+
                 module = __import__("models")
                 class_ = getattr(module, str_arch)
 
-                model = class_()
+                model = class_(lr=lr)
 
                 return model
 
@@ -235,12 +238,10 @@ class DefaultSession:
 
     def train(self):
         self.m = self.session_model.model.fit_generator(generator=self.training_generator, epochs=self.num_epochs,
-                                                        verbose=2, callbacks=self.vec_callbacks,
+                                                        verbose=1, callbacks=self.vec_callbacks,
                                                         validation_data=self.valid_generator)
 
         self.end_epoch = len(self.m.epoch)
-
-
 
 
 if __name__ == '__main__':
@@ -259,7 +260,8 @@ if __name__ == '__main__':
     str_sub = 'sub11'
     vec_idx_run = [1, 2, 3, 4, 5]
 
-    s1 = DefaultSession(d_root, d_data, d_model, d_output, str_sub, vec_idx_run, None, 1, 100, 25, 1e-5)
+    s1 = DefaultSession(d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch='gru_arch_001',
+                        lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5)
     s1.load_all_dataset()
     s1.prepare_training()
     s1.train()

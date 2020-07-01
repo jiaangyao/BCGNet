@@ -32,7 +32,7 @@ mr_combined_xs, mr_combined_ys, mr_vec_ix_slice, mr_ten_ix_slice = \
 training_generator = training.Defaultgenerator(mr_combined_xs[0], mr_combined_ys[0], batch_size=opt.batch_size,
                                                shuffle=True)
 validation_generator = training.Defaultgenerator(mr_combined_xs[1], mr_combined_ys[1], batch_size=opt.batch_size,
-                                                 shuffle=True)
+                                                 shuffle=False)
 
 # Train and fit
 model, callbacks_, m, epochs = ttv.train(training_generator, validation_generator, opt=opt, str_arch=str_arch)
@@ -43,3 +43,5 @@ vec_orig_sr_epoched_cleaned_dataset, vec_orig_sr_cleaned_dataset, vec_epoched_cl
 # Results
 mat_rms_test = compute_rms(vec_run_id, vec_orig_sr_epoched_raw_dataset, vec_orig_sr_epoched_cleaned_dataset,
                            mr_ten_ix_slice)
+
+print('nothing')

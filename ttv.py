@@ -21,9 +21,12 @@ def train(training_generator, validation_generator, opt=test_opt(None), str_arch
     :return:
     """
     # Tensorflow session configuration
-    config = tf.ConfigProto()
-    config.gpu_options.allow_growth = True
-    tf.Session(config=config)
+    if int(tf.__version__[0]) > 1:
+        session_config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(allow_growth=True))
+        sess = tf.compat.v1.Session(config=session_config)
+    else:
+        session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+        sess = tf.Session(config=session_config)
 
     # Obtain the model and callback
     model = get_arch_rnn(str_arch, opt.lr)

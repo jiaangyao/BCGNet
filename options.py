@@ -52,7 +52,7 @@ def test_opt(opt):
         opt.new_fs = 100
 
         # Training parameters
-        opt.epochs = 100
+        opt.epochs = 2500
         opt.training = 0.70
         opt.validation = 0.15
         opt.batch_size = 1

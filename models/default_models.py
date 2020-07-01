@@ -1,8 +1,8 @@
 import tensorflow as tf
-from tensorflow.python.keras import optimizers
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras.regularizers import l2
-from tensorflow.python.keras import backend as K
+from tensorflow.keras import optimizers
+from tensorflow.keras.models import Model
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras import backend as K
 import os
 
 
@@ -105,7 +105,7 @@ class RNNModel(NNModel):
         :return: initialized model
         """
 
-        from tensorflow.python.keras.layers import Input, Bidirectional, GRU, Dense, Dropout
+        from tensorflow.keras.layers import Input, Bidirectional, GRU, Dense, Dropout
 
         session_config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(allow_growth=True))
         sess = tf.compat.v1.Session(config=session_config)
@@ -198,7 +198,7 @@ class RNNModel(NNModel):
         """
         Compile the model based on optional provided optimizer and loss metric
 
-        :param tensorflow.python.keras.optimizers optimizer: optional provided optimizer if wish to use type different
+        :param tensorflow.keras.optimizers optimizer: optional provided optimizer if wish to use type different
             from the default
         :param str loss: type of loss metric used
         :param kwargs: additional arguments that are accepted by keras compile function
@@ -209,7 +209,7 @@ class RNNModel(NNModel):
         if optimizer is not None:
             self.optimizer = optimizer
 
-        self.model.compile(optimizer=self.optimizer, loss=loss, **kwargs)
+        self.model.compile(optimizer='adam', loss=loss, **kwargs)
         self.model.summary()
 
 

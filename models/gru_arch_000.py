@@ -1,6 +1,6 @@
 import tensorflow as tf
-from tensorflow.python.keras.models import Model
-from tensorflow.python.keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras import backend as K
 
 from models.default_models import RNNModel
 from os.path import basename, splitext
@@ -25,7 +25,7 @@ class gru_arch_000(RNNModel):
     # for TF 2.X
     @staticmethod
     def model_tf_v2(n_input, n_output, opt_feature_extract):
-        from tensorflow.python.keras.layers import Input, Dense, Dropout
+        from tensorflow.keras.layers import Input, Dense, Dropout
 
         session_config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(allow_growth=True))
         sess = tf.compat.v1.Session(config=session_config)
