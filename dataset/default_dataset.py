@@ -331,11 +331,10 @@ class DefaultDataset:
                                                                                   self.per_valid, self.num_fold,
                                                                                   self.random_seed)
 
-    # TODO: fix the documentation
     @staticmethod
     def _generate_train_valid_test(epoched_dataset, per_training, per_valid, random_seed):
         """
-        Generate the training, validation and test epoch data from the MNE Epoch object based on the training set
+        Generate the training, validation and test epoch data from the mne.EpochsArray object based on the training set
             ratio and validation set ratio and random seed provided
 
         :param mne.EpochsArray epoched_dataset: object where epoched_dataset.get_data() is the  normalized
@@ -344,16 +343,12 @@ class DefaultDataset:
         :param float per_valid: percentage of validation set epochs
         :param int random_seed: random seed used for the splitting of the dataset
 
-        :return:
-
-
-        :return: xs: list containing all the ECG data in the form of [x_train, x_validation, x_test], where each element
-            is of the form (epoch, channel, data)
-        :return: ys: list containing all the corrupted EEG data in the form of [y_train, y_validation, y_test], where each
-            element is of the form (epoch, channel, data)
-        :return: vec_ix_slice: list in the form of [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test],
-            where each element contains the indices of epochs in the original dataset belonging to the training, validation
-            and test set respectively
+        :return: a tuple (xs, ys, vec_ix_slice), where xs is the list containing all the ECG data in the form of
+            [x_train, x_validation, x_test] and each has shape (epoch, channel, data), ys is a list containing all the
+            corrupted EEG data in the form of [y_train, y_validation, y_test], and each has shape
+            (epoch, channel, data), and vec_ix_slice is a list in the form of [vec_ix_slice_training,
+            vec_ix_slice_validation, vec_ix_slice_test], where each element contains the indices of epochs in the
+            original dataset belonging to the training, validation and test set respectively
         """
 
         # Obtain the data and the index of the ECG channel from the MNE Epoch object
@@ -405,7 +400,6 @@ class DefaultDataset:
 
         return xs, ys, vec_idx_slice
 
-    # TODO: fix the documentation
     @staticmethod
     def _generate_train_valid_test_cv(epoched_dataset, per_valid, num_fold, random_seed):
         """
@@ -418,14 +412,14 @@ class DefaultDataset:
         :param int num_fold: number of cross validation folds
         :param int random_seed: random seed used for the splitting of the dataset
 
-
-        :return: vec_xs: list containing all the ECG data in the form of [fold1, fold2, ...], where each fold is in the form
-            of [x_train, x_validation, x_test] and each element is of the form (epoch, data)
-        :return: vec_ys: list containing all the corrupted EEG data in the form of [fold1, fold2, ...] where each fold is
-            in the form [y_train, y_validation, y_test] and each element is of the form (epoch, channel, data)
-        :return: mat_ix_slice: list in the form of [fold1, fold2, ...], where each fold is of the form of
-            [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test], where each element contains the indices of
-            epochs in the original dataset belonging to the training, validation and test set respectively
+        :return a tuple (vec_xs, vec_ys, mat_ix_slice), where vec_xs is a list containing all the ECG data in
+            the form of [fold1, fold2, ...] and each fold is in the form of [x_train, x_validation, x_test] and each
+            has shape (epoch, data), where vec_ys is a list containing all the corrupted EEG data in the form of
+            [fold1, fold2, ...] and each fold is in the form [y_train, y_validation, y_test] and each has
+            shape (epoch, channel, data), and where mat_ix_slice is a list in the form of [fold1, fold2, ...], where
+            each fold is of the form of [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test], where
+            each element contains the indices of epochs in the original dataset belonging to the training, validation
+            and test set respectively
         """
 
         # Obtain the data and the index of the ECG channel from the MNE Epoch object
@@ -496,10 +490,11 @@ class DefaultDataset:
 
         return vec_xs, vec_ys, mat_idx_slice
 
+    # TODO: implement this later
     def evaluate_dataset(self):
         pass
 
-    # TODO: fix this later
+    # TODO: fix this later when implementing the evaluation script
     @staticmethod
     def _split_epoched_dataset(epoched_dataset, vec_ix_slice):
         """

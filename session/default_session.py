@@ -64,16 +64,17 @@ class DefaultSession:
 
             self.vec_dataset.append(curr_dataset)
 
-    # TODO: get rid of the hardcoding of the dataset convention
-    # TODO: finish documentation
+    # TODO: get rid of the hardcoding of the dataset path convention
     @staticmethod
     def _absolute_path_to_data(d_data, str_sub, vec_idx_run):
         """
+        Obtain the absolute path to the input dataset
 
-        :param d_data:
-        :param str_sub:
-        :param vec_idx_run:
-        :return:
+        :param pathlib.Path d_data: absolute path to the dataset with filename and extension
+        :param str str_sub: naming convention of the subject, e.g. 'sub11'
+        :param list vec_idx_run: list containing the indices of runs to be used for training the model, e.g. [1, 2, 3]
+
+        :return: a list of pathlib.Path objects holding the absolute path to all the individual runs of data
         """
 
         vec_abs_path = []
@@ -83,7 +84,7 @@ class DefaultSession:
 
         return vec_abs_path
 
-    # TODO:
+    # TODO: clean this code up a little bit...
     def prepare_training(self):
         if not self.cv_mode:
 
@@ -146,13 +147,21 @@ class DefaultSession:
         else:
             raise Exception("Unexpected error")
 
-    # TODO: finish documentation
     @staticmethod
     def _combine_from_runs(vec_dataset, random_seed):
         """
+        combine the training, validation and test sets from all dataset each holding a single run of data
 
-        :param vec_dataset:
-        :return:
+        :param list vec_dataset: list of dataset objects where each object holds raw and precessed data from
+            a single run
+        :param random_seed: the random seed used in the experiment for replicable splitting of the dataset
+
+        :return: a tuple (session_xs, session_ys, vec_idx_permute), where session_xs is a list containing all the
+            ECG data from all runs in the form of [x_train, x_validation, x_test] and each has
+            shape (epoch, channel, data), where session_ys is a list containing all the
+            corrupted EEG data in the form of [y_train, y_validation, y_test], and each has shape
+            (epoch, channel, data) and vec_idx_permute containing the order of the random permutation when
+            combining the epochs from each individual dataset
         """
 
         vec_session_x_training = []
@@ -213,7 +222,7 @@ class DefaultSession:
         :return:
         """
 
-        pass
+        raise NotImplementedError
 
     @staticmethod
     def _get_callback(es_patience=25, es_min_delta=1e-5, verbose=0, **kwargs):

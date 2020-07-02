@@ -1,5 +1,10 @@
 import numpy as np
-from tensorflow.keras.utils import Sequence
+import tensorflow as tf
+
+if int(tf.__version__[0]) > 1:
+    from tensorflow.keras.utils import Sequence
+else:
+    from tensorflow.python.keras.utils import Sequence
 
 
 class DefaultGenerator(Sequence):

@@ -1,9 +1,16 @@
 import tensorflow as tf
-from tensorflow.keras import optimizers
-from tensorflow.keras.models import Model
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras import backend as K
-import os
+
+if int(tf.__version__[0]) > 1:
+    from tensorflow.keras import optimizers
+    from tensorflow.keras.models import Model
+    from tensorflow.keras.regularizers import l2
+    from tensorflow.keras import backend as K
+
+else:
+    from tensorflow.python.keras import optimizers
+    from tensorflow.python.keras.models import Model
+    from tensorflow.python.keras.regularizers import l2
+    from tensorflow.python.keras import backend as K
 
 
 class NNModel:
