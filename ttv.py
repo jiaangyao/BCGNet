@@ -33,8 +33,16 @@ def train(training_generator, validation_generator, opt=test_opt(None), str_arch
     callbacks_ = get_callbacks_rnn(opt)
 
     # Fitting the model
-    m = model.fit_generator(generator=training_generator, epochs=opt.epochs, verbose=2, callbacks=callbacks_,
-                            validation_data=validation_generator)
+    # Tensorflow session configuration
+    if int(tf.__version__[0]) > 1:
+        m = model.fit(x=training_generator, epochs=opt.epochs, verbose=2, callbacks=callbacks_,
+                      validation_data=validation_generator)
+    else:
+        m = model.fit_generator(generator=training_generator, epochs=opt.epochs, verbose=2, callbacks=callbacks_,
+                                validation_data=validation_generator)
+
+
+
 
     epochs = len(m.epoch)
 

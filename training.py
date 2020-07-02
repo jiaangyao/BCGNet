@@ -1,12 +1,12 @@
 import numpy as np
-from tensorflow.keras.layers import Input, Bidirectional, Dense, Dropout, GRU
-from tensorflow.keras import callbacks
-from tensorflow.keras import Model
-from tensorflow.keras.regularizers import l2
-from tensorflow.keras.optimizers import Adam
-from tensorflow.keras import backend as K
-from tensorflow.keras.utils import Sequence
+import tensorflow as tf
 
+if int(tf.__version__[0]) > 1:
+    from tensorflow.keras import callbacks
+    from tensorflow.keras.utils import Sequence
+else:
+    from tensorflow.python.keras import callbacks
+    from tensorflow.python.keras.utils import Sequence
 
 def get_arch_rnn(str_arch='gru_arch_general4', lr=1e-3):
     """
@@ -49,46 +49,86 @@ def get_arch_rnn(str_arch='gru_arch_general4', lr=1e-3):
     if str_arch == 'gru_arch_general4':
         # Multi-run, no motion, simple
 
-        K.set_floatx('float64')
-        ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
+        # Tensorflow session configuration
+        if int(tf.__version__[0]) > 1:
+            from tensorflow.keras.layers import Input, Bidirectional, Dense, Dropout, GRU
 
-        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
-                              recurrent_activation='sigmoid', recurrent_dropout=0,
-                              unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(0.096),
-                              activity_regularizer=l2(0.030)))(ecg_input)
+            from tensorflow.keras import Model
+            from tensorflow.keras.regularizers import l2
+            from tensorflow.keras.optimizers import Adam
+            from tensorflow.keras import backend as K
 
-        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
-                              recurrent_activation='sigmoid', recurrent_dropout=0,
-                              unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(0.090),
-                              activity_regularizer=l2(0.013)))(x)
 
-        x = Dense(8, activation='relu')(x)
-        x = Dropout(0.327)(x)
+            session_config = tf.compat.v1.ConfigProto(gpu_options=tf.compat.v1.GPUOptions(allow_growth=True))
+            sess = tf.compat.v1.Session(config=session_config)
 
-        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
-                              recurrent_activation='sigmoid', recurrent_dropout=0,
-                              unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(0.024),
-                              activity_regularizer=l2(0.067)))(x)
+            K.set_floatx('float64')
+            ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
 
-        x = Bidirectional(GRU(64, activation='tanh', return_sequences=True,
-                              recurrent_activation='sigmoid', recurrent_dropout=0,
-                              unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(2.48e-07),
-                              activity_regularizer=l2(0.055)))(x)
+            x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                                  recurrent_activation='sigmoid', recurrent_dropout=0,
+                                  unroll=False, use_bias=True, reset_after=True,
+                                  implementation=2))(ecg_input)
 
-        bcg_out = Dense(63, activation='linear')(x)
-        model = Model(inputs=ecg_input, outputs=bcg_out)
+            x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                                  recurrent_activation='sigmoid', recurrent_dropout=0,
+                                  unroll=False, use_bias=True, reset_after=True,
+                                  implementation=2))(x)
 
-        optimizer_custom = Adam(lr=lr)
-        model.compile(loss='mean_squared_error', optimizer=optimizer_custom)
-        model.summary()
+            x = Dense(8, activation='relu')(x)
+            x = Dropout(0.327)(x)
+
+            x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                                  recurrent_activation='sigmoid', recurrent_dropout=0,
+                                  unroll=False, use_bias=True, reset_after=True,
+                                  implementation=2))(x)
+
+            x = Bidirectional(GRU(64, activation='tanh', return_sequences=True,
+                                  recurrent_activation='sigmoid', recurrent_dropout=0,
+                                  unroll=False, use_bias=True, reset_after=True,
+                                  implementation=2))(x)
+
+            bcg_out = Dense(63, activation='linear')(x)
+            model = Model(inputs=ecg_input, outputs=bcg_out)
+
+            optimizer_custom = Adam(lr=lr)
+            model.compile(loss='mean_squared_error', optimizer=optimizer_custom)
+            model.summary()
+
+        else:
+            from tensorflow.python.keras.layers import Input, Bidirectional, Dense, Dropout, CuDNNGRU
+            from tensorflow.python.keras import Model
+            from tensorflow.python.keras.regularizers import l2
+            from tensorflow.python.keras.optimizers import Adam
+            from tensorflow.python.keras import backend as K
+
+            session_config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+            sess = tf.Session(config=session_config)
+
+            K.set_floatx('float64')
+            ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
+
+            gru1_out = Bidirectional(CuDNNGRU(16, return_sequences=True, recurrent_regularizer=l2(0.096),
+                                              activity_regularizer=l2(0.030)))(ecg_input)
+
+            gru2_out = Bidirectional(CuDNNGRU(16, return_sequences=True, recurrent_regularizer=l2(0.090),
+                                              activity_regularizer=l2(0.013)))(gru1_out)
+
+            d3_out = Dense(8, activation='relu')(gru2_out)
+            d3_out_do = Dropout(0.327)(d3_out)
+
+            gru3_out = Bidirectional(CuDNNGRU(16, return_sequences=True, recurrent_regularizer=l2(0.024),
+                                              activity_regularizer=l2(0.067)))(d3_out_do)
+
+            gru4_out = Bidirectional(CuDNNGRU(64, return_sequences=True, recurrent_regularizer=l2(2.48e-07),
+                                              activity_regularizer=l2(0.055)))(gru3_out)
+
+            bcg_out = Dense(63, activation='linear')(gru4_out)
+            model = Model(inputs=ecg_input, outputs=bcg_out)
+
+            optimizer_custom = Adam(lr=lr)
+            model.compile(loss='mean_squared_error', optimizer=optimizer_custom)
+            model.summary()
 
     else:
         raise Exception("Undefined network arch: {}".format(str_arch))
