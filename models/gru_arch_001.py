@@ -24,7 +24,7 @@ class gru_arch_001(RNNModel):
 
     # for TF 2.X
     @staticmethod
-    def model_tf_v2(n_input, n_output, opt_feature_extract):
+    def _model_tf_v2(n_input, n_output, opt_feature_extract):
         from tensorflow.keras.layers import Input, Dense, Dropout, Bidirectional, GRU
         from tensorflow.keras.regularizers import l1, l2
 
@@ -36,37 +36,32 @@ class gru_arch_001(RNNModel):
         # ---------------------
         # CUSTOM CHANGES STARTS
 
-        ecg_input = Input(shape=(None, n_input), dtype='float64', name='ecg_input')
+        ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
 
-        x = GRU(32, activation='tanh', return_sequences=True,
-                recurrent_activation='sigmoid', recurrent_dropout=0,
-                unroll=False, use_bias=True, reset_after=True,
-                activity_regularizer=l1(5e-3))(ecg_input)
+        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=2))(ecg_input)
 
-        x = GRU(16, activation='tanh', return_sequences=True,
-                recurrent_activation='sigmoid', recurrent_dropout=0,
-                unroll=False, use_bias=True, reset_after=True,
-                activity_regularizer=l1(5e-3))(x)
+        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=2))(x)
 
         x = Dense(8, activation='relu')(x)
-        x = Dropout(0.3)(x)
+        x = Dropout(0.327)(x)
 
-        x = GRU(16, activation='tanh', return_sequences=True,
-                recurrent_activation='sigmoid', recurrent_dropout=0,
-                unroll=False, use_bias=True, reset_after=True,
-                activity_regularizer=l2(5e-2))(x)
+        x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=2))(x)
 
-        x = GRU(32, activation='tanh', return_sequences=True,
-                recurrent_activation='sigmoid', recurrent_dropout=0,
-                unroll=False, use_bias=True, reset_after=True,
-                activity_regularizer=l2(5e-2))(x)
+        x = Bidirectional(GRU(64, activation='tanh', return_sequences=True,
+                              recurrent_activation='sigmoid', recurrent_dropout=0,
+                              unroll=False, use_bias=True, reset_after=True,
+                              implementation=2))(x)
 
-        x = GRU(64, activation='tanh', return_sequences=True,
-                recurrent_activation='sigmoid', recurrent_dropout=0,
-                unroll=False, use_bias=True, reset_after=True,
-                activity_regularizer=l2(5e-2))(x)
-
-        bcg_out = Dense(n_output, activation='linear')(x)
+        bcg_out = Dense(63, activation='linear')(x)
         model = Model(inputs=ecg_input, outputs=bcg_out)
 
         # CUSTOM CHANGES ENDS

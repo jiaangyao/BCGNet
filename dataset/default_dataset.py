@@ -1,8 +1,10 @@
 import mne
 import numpy as np
+import tensorflow as tf
+
 from scipy.stats import median_absolute_deviation
 from settings import get_str_proc
-from utils import temp_seed
+from utils import temp_seed, interpolate_raw_dataset
 
 """
 Each dataset object contains a single run of data from a single subject loaded by mne
@@ -38,6 +40,9 @@ class DefaultDataset:
         self.epoch_rejected = False
         self.vec_idx_good_epochs = None
 
+        self.epoched_cleaned_dataset = None
+        self.cleaned_dataset = None
+
         if per_training + per_valid + per_test > 1:
             raise RuntimeError("Total percentage greater than 1")
 
@@ -72,7 +77,10 @@ class DefaultDataset:
                 self.orig_raw_dataset = self._load_dataset(d_input, verbose=False)
                 self.resampled = True
 
-        # TODO: delete the following snippet (since the user doesn't have any motion data)
+                self.epoched_orig_cleaned_dataset = None
+                self.orig_cleaned_dataset = None
+
+                # TODO: delete the following snippet (since the user doesn't have any motion data)
         # TODO: put the channel names in a meta file somewhere
         if get_str_proc() == 'proc_full':
             self.raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
@@ -129,9 +137,9 @@ class DefaultDataset:
 
         :param mne.io.RawArray raw_dataset: object that contains the unstandardized raw data
 
-        :return: a tuple (standardized_raw_dataset, ecg_stats, eeg_stats), where standardized_raw_dataset is the object
-            that contains data by channels, ecg_stats is a list [ecg_mean, ecg_std] and eeg_stats is a list
-            [[eeg_mean1, eeg_mean2,...], [eeg_std1, eeg_std2,...]]
+        :return: a tuple (standardized_dataset, ecg_stats, eeg_stats), where standardized_dataset is the object
+            that contains standardized data by channels, ecg_stats is a list [ecg_mean, ecg_std] and eeg_stats
+            is a list [[eeg_mean1, eeg_mean2,...], [eeg_std1, eeg_std2,...]]
         """
 
         # obtain the data numpy array and information structure from the MNE Raw object
@@ -163,7 +171,47 @@ class DefaultDataset:
 
         return standardized_raw_dataset, ecg_stats, eeg_stats
 
+    @staticmethod
+    def _unstandardize_ecg_data(standardized_ecg_data, ecg_stats):
+        """
+        unstandardize the ecg data
+
+        :param np.ndarray standardized_ecg_data: standardized ecg data with shape (n_samples,) or (1, n_samples, 1)
+        :param list ecg_stats: a list [ecg_mean, ecg_std]
+
+        :return: unstandardized ecg data with same shape as input
+        """
+
+        unstandardized_ecg_data = standardized_ecg_data * ecg_stats[1] + ecg_stats[0]
+
+        return unstandardized_ecg_data
+
+    @staticmethod
+    def _unstandardize_eeg_data(standardized_ecg_data, eeg_stats):
+        """
+        unstandardize the eeg data
+
+        :param np.ndarray standardized_ecg_data: standardized eeg data with shape (n_channels, n_samples)
+        :param list eeg_stats: a list [[eeg_mean1, eeg_mean2,...], [eeg_std1, eeg_std2,...]]
+
+        :return: unstandardized eeg data with same shape as input
+        """
+
+        # Create empty array same size as input
+        unstandardized_eeg_data = np.zeros(standardized_ecg_data.shape)
+
+        # Loop through the channels of the input
+        for i in range(standardized_ecg_data.shape[0]):
+            # For each channel, perform the renormalization
+            unstandardized_eeg_data[i, :] = standardized_ecg_data[i, :] * eeg_stats[1][i] + eeg_stats[0][i]
+
+        return unstandardized_eeg_data
+
     def _epoch_dataset(self):
+        """
+        performs epoching of the dataset
+        """
+
         if self.standardized_dataset is None:
             raise RuntimeError("Need to run standardization first")
 
@@ -186,10 +234,13 @@ class DefaultDataset:
 
         :param mne.io.RawArray raw_dataset: object holding the dataset for which epoching operation is to be performed,
             used for obtaining the length in time of the original recording
-        :param len_epoch: length of each epoch in seconds
+        :param int/float len_epoch: length of each epoch in seconds
         :param mad_threshold: # times the mean absolute deviation to set the threshold for MAD-based epoch rejection
 
-        :return: processed epoched dataset
+        :return: a tuple (epoched_dataset, vec_idx_good_epochs, epoch_rejected) where epoched_dataset is an
+            mne.EpochsArray object that holds all epochs that passed epoch rejection, vec_idx_good_epochs is a list
+            that contains the indices of all epochs that passed the rejection in the original epoched dataset, and
+            epoch_rejected is a boolean flag that indicates whether or not any epochs where actually rejected
         """
 
         # obtain the number of samples in the original recording and the sampling rate
@@ -226,7 +277,7 @@ class DefaultDataset:
 
         :param mne.io.RawArray raw_dataset: object holding the dataset for which epoching operation is to be performed,
             used for obtaining the length in time of the original recording
-        :param int len_epoch: length of each epoch in seconds
+        :param int/float len_epoch: length of each epoch in seconds
         :param numpy.ndarray vec_idx_good_epochs: list of epochs that passed the MAD-based rejection test
 
         :return: an mne.EpochsArray object that holds the epoched dataset where epochs equivalent to those that passed
@@ -490,6 +541,121 @@ class DefaultDataset:
 
         return vec_xs, vec_ys, mat_idx_slice
 
+    def clean_dataset(self, model, vec_callbacks=None):
+        """
+        generate the cleaned datasets using provided model and callback objetcs
+
+        :param tensorflow.keras.Model/tensorflow.keras.Sequential model: keras model that was trained
+        :param list vec_callbacks: (optional) a list containing the early stopping object used during training
+            (only relevant if TF 2.X is used)
+        """
+
+        if self.resampled:
+            self.epoched_orig_cleaned_dataset, self.orig_cleaned_dataset, self.epoched_cleaned_dataset, \
+                self.cleaned_dataset = self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
+                                                           orig_raw_dataset=self.orig_raw_dataset,
+                                                           standardized_dataset=self.standardized_dataset,
+                                                           raw_dataset=self.raw_dataset,
+                                                           resampled=self.resampled,
+                                                           ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
+                                                           len_epoch=self.len_epoch,
+                                                           vec_idx_good_epochs=self.vec_idx_good_epochs)
+        else:
+            self.epoched_cleaned_dataset, self.cleaned_dataset = \
+                self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
+                                    standardized_dataset=self.standardized_dataset,
+                                    raw_dataset=self.raw_dataset,
+                                    resampled=self.resampled,
+                                    ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
+                                    len_epoch=self.len_epoch,
+                                    vec_idx_good_epochs=self.vec_idx_good_epochs)
+
+    @staticmethod
+    def _clean_dataset(model, vec_callbacks, standardized_dataset, raw_dataset, resampled,
+                         ecg_stats, eeg_stats, len_epoch, vec_idx_good_epochs, orig_raw_dataset=None):
+        """
+        Generates the unstandardized ECG and predicted BCG time series
+
+        :param tensorflow.keras.Model/tensorflow.keras.Sequential model: keras model that was trained
+        :param list vec_callbacks: a list containing the early stopping object used during training
+        :param mne.io.RawArray standardized_dataset: the object that contains standardized data by channels
+        :param mne.io.RawArray: raw_dataset: the object that holds
+        :param bool resampled: whether or not the dataset was resampled
+        :param list ecg_stats: ecg_stats: list in the form of [mean_ECG, std_ECG]
+        :param list eeg_stats: input list in the form of [[eeg_ch1_mean, eeg_ch2_mean, ...],
+            [eeg_ch1_std, eeg_ch2_std, ...]]
+        :param int len_epoch: length of each epoch in seconds
+        :param np.ndarray vec_idx_good_epochs: indices of epochs that passed the epoch rejection test
+        :param mne.io.RawArray orig_raw_dataset: (optional) object that holds the unstandardized data from the original
+            dataset (only relevant when the dataset is resampled)
+
+        :return a tuple (epoched_orig_cleaned_dataset, orig_cleaned_dataset, epoched_cleaned_dataset, cleaned_dataset),
+            where epoched_orig_cleaned_dataset and orig_cleaned_dataset are the epoched and time series version
+            of cleaned data interpolated to original sampling rate and epoched_cleaned_dataset, cleaned_dataset
+            are epoched and time series version of cleaned data with the resampled sampling rate or a tuple
+            (epoched_cleaned_dataset, cleaned_dataset) is no resampling was performed
+        """
+
+        # Obtain the normalized raw data and the info object holding the channel information
+        standardized_data = standardized_dataset.get_data()
+        info = standardized_dataset.info
+
+        # Obtain the index of the ECG channel
+        ch_ecg = info['ch_names'].index('ECG')
+
+        # Obtain the indices of all the EEG channels
+        ch_eeg = np.delete(np.arange(0, len(info['ch_names']), 1), ch_ecg)
+
+        # Obtain the standardized ECG and EEG data
+        # get the ECG data and perform reshape so that the shape works with Keras
+        standardized_ecg_data = standardized_data[ch_ecg, :].reshape(1, standardized_data.shape[1], 1)
+
+        # get the EEG data, no need to do any transformation here, note that data in the form (channel, data)
+        standardized_eeg_data = standardized_data[ch_eeg, :]
+
+        # Predict the BCG data in all EEG channels, note that since Keras generates data in the form of
+        # (1, data, channel), and a transpose is needed at the end to convert to channel-major format
+        if int(tf.__version__[0]) > 1:
+            predicted_bcg_data = model.predict(x=standardized_ecg_data, callbacks=vec_callbacks, verbose=0)
+
+        else:
+            predicted_bcg_data = model.predict(x=standardized_ecg_data, verbose=0)
+        predicted_bcg_data = np.transpose(
+            predicted_bcg_data.reshape(predicted_bcg_data.shape[1], predicted_bcg_data.shape[2]))
+
+        # Obtain the cleaned EEG data
+        standardized_cleaned_eeg_data = standardized_eeg_data - predicted_bcg_data
+
+        # Undo the normalization
+        ecg_data = DefaultDataset._unstandardize_ecg_data(standardized_ecg_data, ecg_stats)
+        cleaned_eeg_data = DefaultDataset._unstandardize_eeg_data(standardized_cleaned_eeg_data, eeg_stats)
+
+        # Check if the normalization is performed normally
+        orig_ecg_data = raw_dataset.get_data()[ch_ecg, :].reshape(1, raw_dataset.get_data().shape[1], 1)
+        if not np.allclose(ecg_data, orig_ecg_data):
+            raise Exception('Normalization failed during prediction')
+
+        # reshape to make dimension correct
+        ecg_data = ecg_data.reshape(-1)
+
+        # If performed normally, then generate an mne.io_ops.RawArray object holding the cleaned data
+        cleaned_data = np.insert(cleaned_eeg_data, ch_ecg, ecg_data, axis=0)
+        cleaned_dataset = mne.io.RawArray(cleaned_data, info, verbose=False)
+
+        # Obtain the data from the ground truth dataset that corresponds to epochs that passed the MAD rejection
+        # and that are used in training the model
+        epoched_cleaned_dataset = DefaultDataset._extract_good_epochs(cleaned_dataset, len_epoch, vec_idx_good_epochs)
+
+        if resampled:
+            # Interpolate the dataset and perform the same operation
+            orig_cleaned_dataset = interpolate_raw_dataset(cleaned_dataset, orig_raw_dataset)
+            epoched_orig_cleaned_dataset = DefaultDataset._extract_good_epochs(orig_cleaned_dataset, len_epoch,
+                                                                               vec_idx_good_epochs)
+
+            return epoched_orig_cleaned_dataset, orig_cleaned_dataset, epoched_cleaned_dataset, cleaned_dataset
+
+        return epoched_cleaned_dataset, cleaned_dataset
+
     # TODO: implement this later
     def evaluate_dataset(self):
         pass
@@ -540,5 +706,23 @@ if __name__ == '__main__':
     dataset = DefaultDataset(d_ga_removed, new_fs=500)
     dataset.prepare_dataset()
     dataset.split_dataset()
+
+    from models import gru_arch_001
+    from session import default_session
+    from tensorflow.keras import callbacks
+
+    p_weights = Path('/home/jyao/Downloads')
+    f_weights = 'model'
+    session_model = gru_arch_001()
+    session_model.init_model()
+    session_model.compile_model()
+
+    session_model.load_model_weights(p_weights, f_weights)
+
+    vec_callbacks = [callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5,
+                                             patience=25, verbose=0, mode='min',
+                                             restore_best_weights=True)]
+
+    dataset.clean_dataset(session_model.model, vec_callbacks)
 
     print('nothing')

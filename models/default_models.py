@@ -2,7 +2,7 @@ import tensorflow as tf
 
 if int(tf.__version__[0]) > 1:
     from tensorflow.keras import optimizers
-    from tensorflow.keras.models import Model
+    from tensorflow.keras import Model
     from tensorflow.keras.regularizers import l2
     from tensorflow.keras import backend as K
 
@@ -81,14 +81,14 @@ class RNNModel(NNModel):
         """
 
         if int(tf.__version__[0]) > 1:
-            self.model = self.model_tf_v2(self.n_input, self.n_output, self.opt_feature_extract)
+            self.model = self._model_tf_v2(self.n_input, self.n_output, self.opt_feature_extract)
 
         else:
-            self.model = self.model_tf_v1(self.n_input, self.n_output, self.opt_feature_extract)
+            self.model = self._model_tf_v1(self.n_input, self.n_output, self.opt_feature_extract)
 
     # TODO: implement compatibility check with opt_feature_extract
     @staticmethod
-    def model_tf_v2(n_input, n_output, opt_feature_extract):
+    def _model_tf_v2(n_input, n_output, opt_feature_extract):
         """
         Initialize the tensorflow 2.X version of the model
 
@@ -103,7 +103,10 @@ class RNNModel(NNModel):
         6. Inputs are not masked or strictly right padded.
         7. reset_after == True
 
-        here implementation also set to 1 to avoid issues with tf loss value blowing up
+        Additional Note:
+        all the regularization terms have been omitted due to instability encountered when using
+        the same regularization parameters as in the TF1 model. The model performance was compared
+        using multiple subjects and were largely similar
 
         :param int n_input: number of input dimensions (number of ECG + aux channels)
         :param int n_output: number of output (number of EEG channels)
@@ -118,21 +121,17 @@ class RNNModel(NNModel):
         sess = tf.compat.v1.Session(config=session_config)
 
         K.set_floatx('float64')
-        ecg_input = Input(shape=(None, n_input), dtype='float64', name='ecg_input')
+        ecg_input = Input(shape=(None, 1), dtype='float64', name='ecg_input')
 
         x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
                               recurrent_activation='sigmoid', recurrent_dropout=0,
                               unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(0.096),
-                              activity_regularizer=l2(0.030)))(ecg_input)
+                              implementation=2))(ecg_input)
 
         x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
                               recurrent_activation='sigmoid', recurrent_dropout=0,
                               unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(0.090),
-                              activity_regularizer=l2(0.013)))(x)
+                              implementation=2))(x)
 
         x = Dense(8, activation='relu')(x)
         x = Dropout(0.327)(x)
@@ -140,25 +139,21 @@ class RNNModel(NNModel):
         x = Bidirectional(GRU(16, activation='tanh', return_sequences=True,
                               recurrent_activation='sigmoid', recurrent_dropout=0,
                               unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(0.024),
-                              activity_regularizer=l2(0.067)))(x)
+                              implementation=2))(x)
 
         x = Bidirectional(GRU(64, activation='tanh', return_sequences=True,
                               recurrent_activation='sigmoid', recurrent_dropout=0,
                               unroll=False, use_bias=True, reset_after=True,
-                              implementation=1,
-                              recurrent_regularizer=l2(2.48e-07),
-                              activity_regularizer=l2(0.055)))(x)
+                              implementation=2))(x)
 
-        bcg_out = Dense(n_output, activation='linear')(x)
+        bcg_out = Dense(63, activation='linear')(x)
         model = Model(inputs=ecg_input, outputs=bcg_out)
 
         return model
 
     # TODO: implement compatibility check with opt_feature_extract
     @staticmethod
-    def model_tf_v1(n_input, n_output, opt_feature_extract):
+    def _model_tf_v1(n_input, n_output, opt_feature_extract):
         """
 
         Initialize the tensorflow 1.1X version of the model
@@ -211,13 +206,47 @@ class RNNModel(NNModel):
         :param kwargs: additional arguments that are accepted by keras compile function
 
         """
-        K.set_floatx('float64')
 
         if optimizer is not None:
             self.optimizer = optimizer
 
         self.model.compile(optimizer='adam', loss=loss, **kwargs)
         self.model.summary()
+
+    def save_model_weights(self, p_weights, f_weights, overwrite=True, format='tf'):
+        """
+        save the model weights. If TF 1.X, save to the h5 format and if TF 2.X can use the user provided format
+
+        :param pathlib.Path p_weights: absolute path to the directory to save the model weights in
+        :param str f_weights: filename of the saved weights
+        ;:param bool overwrite: whether or not to overwrite any existing model weights
+        :param str format: format to save the weights in
+        """
+
+        if int(tf.__version__[0]) > 1:
+            self.model.save_weights(filepath=str(p_weights / f_weights), overwrite=overwrite, save_format=format)
+
+        else:
+            self.model.save_weights(filepath=str(p_weights / f_weights), overwrite=overwrite, save_format='h5')
+
+    def load_model_weights(self, p_weights, f_weights, **kwargs):
+        """
+        load model weights from a saved weight file
+
+        :param pathlib.Path p_weights: absolute path to the directory to save the model weights in
+        :param str f_weights: filename of the saved weights
+        :param kwargs: additional arguments accepted by the tensorflow.keras.Model.load_weights() function
+        """
+
+        try:
+            if int(tf.__version__[0]) > 1:
+                self.model.load_weights(filepath=str(p_weights / f_weights), **kwargs)
+
+            else:
+                self.model.save_weights(filepath=str(p_weights / f_weights), **kwargs)
+
+        except:
+            raise RuntimeError("Issue encountered while loading saved weights")
 
 
 if __name__ == '__main__':

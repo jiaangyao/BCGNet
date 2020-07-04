@@ -1,5 +1,7 @@
 import os
+import tensorflow as tf
 import numpy as np
+
 from pathlib import Path
 from dataset import DefaultDataset
 from models import update_init
@@ -14,7 +16,7 @@ class DefaultSession:
     # TODO: figure out d_data from cfg
     def __init__(self, d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch,
                  lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5,
-                 cv_mode=False, random_seed=1997, cfg=None):
+                 cv_mode=False, random_seed=1997, verbose=1, cfg=None):
         self.cfg = cfg
 
         self.d_root = d_root
@@ -35,6 +37,7 @@ class DefaultSession:
         self.cv_mode = cv_mode
 
         self.random_seed = random_seed
+        self.verbose = verbose
 
         self.training_generator = None
         self.valid_generator = None
@@ -246,11 +249,25 @@ class DefaultSession:
         return vec_callbacks
 
     def train(self):
-        self.m = self.session_model.model.fit_generator(generator=self.training_generator, epochs=self.num_epochs,
-                                                        verbose=1, callbacks=self.vec_callbacks,
-                                                        validation_data=self.valid_generator)
+        """
+        initiate training
+        """
+
+        if int(tf.__version__[0]) > 1:
+            self.m = self.session_model.model.fit(x=self.training_generator, epochs=self.num_epochs,
+                                                  verbose=self.verbose, callbacks=self.vec_callbacks,
+                                                  validation_data=self.valid_generator)
+
+        else:
+            self.m = self.session_model.model.fit_generator(generator=self.training_generator, epochs=self.num_epochs,
+                                                            verbose=self.verbose, callbacks=self.vec_callbacks,
+                                                            validation_data=self.valid_generator)
 
         self.end_epoch = len(self.m.epoch)
+
+    def predict(self):
+        raise NotImplementedError
+
 
 
 if __name__ == '__main__':
@@ -266,11 +283,11 @@ if __name__ == '__main__':
     d_model = None
     d_output = None
 
-    str_sub = 'sub11'
+    str_sub = 'sub12'
     vec_idx_run = [1, 2, 3, 4, 5]
 
     s1 = DefaultSession(d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch='gru_arch_001',
-                        lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5)
+                        lr=1e-3, batch_size=1, num_epochs=5, es_patience=25, es_min_delta=1e-5)
     s1.load_all_dataset()
     s1.prepare_training()
     s1.train()
