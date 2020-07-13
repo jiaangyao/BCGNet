@@ -2,9 +2,11 @@ import mne
 import numpy as np
 import tensorflow as tf
 
+import scipy.io as sio
 from scipy.stats import median_absolute_deviation
 from settings import get_str_proc
-from utils import temp_seed, interpolate_raw_dataset
+from utils import temp_seed
+from dataset import interpolate_raw_dataset, compute_rms
 
 """
 Each dataset object contains a single run of data from a single subject loaded by mne
@@ -14,8 +16,9 @@ Each dataset object contains a single run of data from a single subject loaded b
 class DefaultDataset:
     # TODO: check whether cfg is correctly used here and if it's correctly documented in the docstring
     # TODO: obtain the fields from the cfg object
-    def __init__(self, d_input, len_epoch=3, mad_threshold=5, new_fs=None, per_training=0.7, per_valid=0.15,
-                 per_test=0.15, random_seed=1997, cv_mode=False, num_fold=None, cfg=None):
+    def __init__(self, d_input, str_sub, idx_run, d_eval=None, str_eval=None, len_epoch=3, mad_threshold=5, new_fs=None,
+                 per_training=0.7, per_valid=0.15, per_test=0.15,
+                 random_seed=1997, cv_mode=False, num_fold=None, cfg=None):
         """
         Load in the dataset and resample if needed
 
@@ -28,7 +31,15 @@ class DefaultDataset:
         self.cfg = cfg
 
         # Load in the dataset
+        self.str_sub = str_sub
+        self.idx_run = idx_run
+
         self.raw_dataset = self._load_dataset(d_input)
+        self.eval_dataset = None
+        self.str_eval = None
+        if d_eval is not None:
+            self.eval_dataset = self._load_dataset(d_eval)
+            self.str_eval = str_eval
         self.fs = int(self.raw_dataset.info['sfreq'])
         self.resampled = False
 
@@ -50,6 +61,8 @@ class DefaultDataset:
         self.per_valid = per_valid
         self.per_test = per_test
         self.random_seed = random_seed
+
+        self.rms_results = {}
 
         self.cv_mode = cv_mode
         if cv_mode:
@@ -80,7 +93,7 @@ class DefaultDataset:
                 self.epoched_orig_cleaned_dataset = None
                 self.orig_cleaned_dataset = None
 
-                # TODO: delete the following snippet (since the user doesn't have any motion data)
+        # TODO: delete the following snippet (since the user doesn't have any motion data)
         # TODO: put the channel names in a meta file somewhere
         if get_str_proc() == 'proc_full':
             self.raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
@@ -226,6 +239,10 @@ class DefaultDataset:
         if self.resampled:
             self.epoched_orig_raw_dataset = self._extract_good_epochs(self.orig_raw_dataset, self.len_epoch,
                                                                       self.vec_idx_good_epochs)
+
+        if self.eval_dataset is not None:
+            self.epoched_eval_dataset = self._extract_good_epochs(self.eval_dataset, self.len_epoch,
+                                                                  self.vec_idx_good_epochs)
 
     @staticmethod
     def _perform_epoching(raw_dataset, len_epoch, mad_threshold):
@@ -452,6 +469,40 @@ class DefaultDataset:
         return xs, ys, vec_idx_slice
 
     @staticmethod
+    def _split_epoched_dataset(epoched_dataset, vec_idx_slice):
+        """
+        Split the mne.io_ops.Mne object holding the cleaned EEG data into the same set of training, validation and test
+        epochs as during the training
+
+        :param mne.EpochsArray epoched_dataset: object that holds the epoched data, note that the data held has the
+            form (epoch, channel, data)
+        :param vec_idx_slice: list in the form of [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test],
+            where each element contains the indices of epochs in the original dataset belonging to the
+            training, validation and test set respectively
+
+        :return: a list in the form of [epoched_dataset_training, epoched_dataset_validation, epoched_dataset_test],
+            where each is an mne.io_ops.Mne object that holds epoched data belonging to
+            the specified set during training
+        """
+
+        # Get the data and info object first
+        epoched_data = epoched_dataset.get_data()
+        info = epoched_dataset.info
+
+        # Get the training, validation and test data
+        epoched_data_training = epoched_data[vec_idx_slice[0], :, :]
+        epoched_data_validation = epoched_data[vec_idx_slice[1], :, :]
+        epoched_data_test = epoched_data[vec_idx_slice[2], :, :]
+
+        epoched_dataset_training = mne.EpochsArray(epoched_data_training, info, verbose=False)
+        epoched_dataset_validation = mne.EpochsArray(epoched_data_validation, info, verbose=False)
+        epoched_dataset_test = mne.EpochsArray(epoched_data_test, info, verbose=False)
+
+        vec_epoched_dataset = [epoched_dataset_training, epoched_dataset_validation, epoched_dataset_test]
+
+        return vec_epoched_dataset
+
+    @staticmethod
     def _generate_train_valid_test_cv(epoched_dataset, per_valid, num_fold, random_seed):
         """
         Generate the training, validation and test epoch data from the MNE Epoch object based on the number of folds
@@ -541,6 +592,7 @@ class DefaultDataset:
 
         return vec_xs, vec_ys, mat_idx_slice
 
+    # TODO: reconsider the _ variables here.... as well as the standardized data...
     def clean_dataset(self, model, vec_callbacks=None):
         """
         generate the cleaned datasets using provided model and callback objetcs
@@ -551,8 +603,8 @@ class DefaultDataset:
         """
 
         if self.resampled:
-            self.epoched_orig_cleaned_dataset, self.orig_cleaned_dataset, self.epoched_cleaned_dataset, \
-                self.cleaned_dataset = self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
+            self.epoched_orig_cleaned_dataset, self.orig_cleaned_dataset, _, \
+                _ = self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
                                                            orig_raw_dataset=self.orig_raw_dataset,
                                                            standardized_dataset=self.standardized_dataset,
                                                            raw_dataset=self.raw_dataset,
@@ -569,6 +621,10 @@ class DefaultDataset:
                                     ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
                                     len_epoch=self.len_epoch,
                                     vec_idx_good_epochs=self.vec_idx_good_epochs)
+
+        # clean up the standardized data instance variables to save memory
+        self.standardized_dataset = None
+        self.epoched_standardized_dataset = None
 
     @staticmethod
     def _clean_dataset(model, vec_callbacks, standardized_dataset, raw_dataset, resampled,
@@ -656,44 +712,77 @@ class DefaultDataset:
 
         return epoched_cleaned_dataset, cleaned_dataset
 
-    # TODO: implement this later
-    def evaluate_dataset(self):
-        pass
-
-    # TODO: fix this later when implementing the evaluation script
-    @staticmethod
-    def _split_epoched_dataset(epoched_dataset, vec_ix_slice):
+    def evaluate_dataset(self, mode='test'):
         """
-        Split the mne.io_ops.Mne object holding the cleaned EEG data into the same set of training, validation and test
-        epochs as during the training
+        Evaluate the performance of the model compared to raw and optional evaluation dataset and package all results
+        into a dictionary
 
-        :param epoched_dataset: mne.io_ops.Mne object that holds the epoched data, note that the data held has the form
-            (epoch, channel, data)
-        :param vec_ix_slice: list in the form of [vec_ix_slice_training, vec_ix_slice_validation, vec_ix_slice_test],
-            where each element contains the indices of epochs in the original dataset belonging to the training, validation
-            and test set respectively
-
-        :return: vec_epoched_dataset_set: list in the form of [epoched_dataset_training, epoched_dataset_validation,
-            epoched_dataset_test], where each is an mne.io_ops.Mne object that holds epoched data belonging to the specified set
-            during training
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
+        power ratio from
         """
 
-        # Get the data and info object first
-        epoched_data = epoched_dataset.get_data()
-        info = epoched_dataset.info
+        if self.resampled:
+            vec_epoched_raw_dataset = DefaultDataset._split_epoched_dataset(self.epoched_orig_raw_dataset,
+                                                                            self.vec_idx_slice)
 
-        # Get the training, validation and test data
-        epoched_data_training = epoched_data[vec_ix_slice[0], :, :]
-        epoched_data_validation = epoched_data[vec_ix_slice[1], :, :]
-        epoched_data_test = epoched_data[vec_ix_slice[2], :, :]
+            vec_epoched_cleaned_dataset = DefaultDataset._split_epoched_dataset(self.epoched_orig_cleaned_dataset,
+                                                                                self.vec_idx_slice)
+        else:
+            vec_epoched_raw_dataset = DefaultDataset._split_epoched_dataset(self.epoched_raw_dataset,
+                                                                            self.vec_idx_slice)
 
-        epoched_dataset_training = mne.EpochsArray(epoched_data_training, info)
-        epoched_dataset_validation = mne.EpochsArray(epoched_data_validation, info)
-        epoched_dataset_test = mne.EpochsArray(epoched_data_test, info)
+            vec_epoched_cleaned_dataset = DefaultDataset._split_epoched_dataset(self.epoched_cleaned_dataset,
+                                                                                self.vec_idx_slice)
 
-        vec_epoched_dataset_set = [epoched_dataset_training, epoched_dataset_validation, epoched_dataset_test]
+        if self.eval_dataset is not None:
+            vec_epoched_eval_dataset = DefaultDataset._split_epoched_dataset(self.epoched_eval_dataset,
+                                                                             self.vec_idx_slice)
 
-        return vec_epoched_dataset_set
+            vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,
+                                      vec_epoched_eval_dataset=vec_epoched_eval_dataset,
+                                      str_eval=self.str_eval, mode=mode)
+        else:
+            vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,
+                                      mode=mode)
+
+        self.rms_results[mode] = vec_rms_set
+
+    def save_dataset(self, p_output, f_output, overwrite, **kwargs):
+        """
+        Save the processed dataset in Neuromag .fif format
+
+        :param pathlib.Path p_output: directory to save the dataset into
+        :param str f_output: filename of the saved dataset
+        :param overwrite: whether or not to overwrite any existing files
+        :param kwargs: other arguments that are accepted by mne.io.Raw.save() function
+        """
+        if self.resampled:
+            self.orig_cleaned_dataset.save(fname=str(p_output / f_output), overwrite=overwrite, **kwargs)
+        else:
+            self.cleaned_dataset.save(fname=str(p_output / f_output), overwrite=overwrite, **kwargs)
+
+    def save_data(self, p_output, f_output, overwrite, **kwargs):
+        """
+        Save the processed data in MATLAB .mat format
+
+        :param pathlib.Path p_output: directory to save the dataset into
+        :param str f_output: filename of the saved dataset
+        :param overwrite: whether or not to overwrite any existing files
+        :param kwargs: other keyword arguments accepted by the sio.savemat() function
+        """
+
+        # make output directory if not exist already
+        p_output.mkdir(exist_ok=True, parents=True)
+
+        # Obtain the data
+        if self.resampled:
+            cleaned_data = self.orig_cleaned_dataset.get_data()
+        else:
+            cleaned_data = self.cleaned_dataset.get_data()
+
+        # Save the dataset
+        if overwrite or (p_output / f_output).exists() is False:
+            sio.savemat(str(p_output / f_output), {'data': cleaned_data}, **kwargs)
 
 
 if __name__ == '__main__':
@@ -702,8 +791,13 @@ if __name__ == '__main__':
     import settings
 
     settings.init(Path.home(), Path.home())  # Call only once
-    d_ga_removed = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_rs/sub11/sub11_r01_rs.set')
-    dataset = DefaultDataset(d_ga_removed, new_fs=500)
+    str_sub = 'sub12'
+    idx_run = 5
+    d_ga_removed = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_rs/{}/{}_r0{}_rs.set'.format(str_sub,
+                                                                                                     str_sub, idx_run))
+    d_obs = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_bcgobs/{}/{}_r0{}_rmbcg.set'.format(str_sub,
+                                                                                                     str_sub, idx_run))
+    dataset = DefaultDataset(d_ga_removed, str_sub, idx_run, d_eval=d_obs, str_eval='OBS', new_fs=100)
     dataset.prepare_dataset()
     dataset.split_dataset()
 
@@ -724,5 +818,6 @@ if __name__ == '__main__':
                                              restore_best_weights=True)]
 
     dataset.clean_dataset(session_model.model, vec_callbacks)
+    dataset.evaluate_dataset('test')
 
     print('nothing')

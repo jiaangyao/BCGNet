@@ -25,7 +25,7 @@ def interpolate_raw_dataset(dataset, orig_sr_raw_dataset):
     info = orig_sr_raw_dataset.info
 
     # substitute the ECG data with original ECG data
-    interpolated_dataset = mne.io.RawArray(interpolated_data, info)
+    interpolated_dataset = mne.io.RawArray(interpolated_data, info, verbose=False)
 
     return interpolated_dataset
 

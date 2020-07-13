@@ -1,4 +1,5 @@
 import os
+import time
 import tensorflow as tf
 import numpy as np
 
@@ -14,19 +15,23 @@ from tensorflow.keras import callbacks
 
 class DefaultSession:
     # TODO: figure out d_data from cfg
-    def __init__(self, d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch,
-                 lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5,
-                 cv_mode=False, random_seed=1997, verbose=1, cfg=None):
+    # TODO: change all str_arch to str_model?
+    def __init__(self, d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch, d_eval=None, str_eval=None,
+                 new_fs=100, lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5,
+                 cv_mode=False, random_seed=1997, verbose=2, overwrite=False, cfg=None):
         self.cfg = cfg
 
         self.d_root = d_root
         self.d_data = d_data
         self.d_model = d_model
         self.d_output = d_output
+        self.d_eval = d_eval
 
         self.str_sub = str_sub
         self.vec_idx_run = vec_idx_run
         self.str_arch = str_arch
+        self.str_eval = str_eval
+        self.new_fs = new_fs
 
         self.lr = lr
         self.batch_size = batch_size
@@ -37,6 +42,7 @@ class DefaultSession:
         self.cv_mode = cv_mode
 
         self.random_seed = random_seed
+        self.overwrite = overwrite
         self.verbose = verbose
 
         self.training_generator = None
@@ -55,12 +61,24 @@ class DefaultSession:
 
     def load_all_dataset(self):
         # Obtain the absolute path to all dataset for a given subject
-        vec_abs_path = DefaultSession._absolute_path_to_data(self.d_data, self.str_sub, self.vec_idx_run)
+        vec_abs_data_path = DefaultSession._absolute_path_to_data(self.d_data, self.str_sub, self.vec_idx_run)
+        if self.d_eval is not None:
+            vec_abs_eval_path = DefaultSession._absolute_path_to_eval(self.d_eval, self.str_sub, self.vec_idx_run)
 
         # initialize the dataset objects each corresponding to a single run of data
-        for abs_path in vec_abs_path:
+        for i in range(len(vec_abs_data_path)):
             # TODO: check the init statement here once dataset implementation is done
-            curr_dataset = DefaultDataset(abs_path, new_fs=100, random_seed=self.random_seed)
+            idx_run = self.vec_idx_run[i]
+            abs_data_path = vec_abs_data_path[i]
+            if self.d_eval is not None:
+                abs_eval_path = vec_abs_eval_path[i]
+
+                curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
+                                              d_eval=abs_eval_path, str_eval=self.str_eval,
+                                              new_fs=self.new_fs, random_seed=self.random_seed)
+            else:
+                curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
+                                              new_fs=self.new_fs, random_seed=self.random_seed)
 
             curr_dataset.prepare_dataset()
             curr_dataset.split_dataset()
@@ -84,6 +102,28 @@ class DefaultSession:
 
         for idx_run in vec_idx_run:
             vec_abs_path.append(d_data / str_sub / '{}_r0{}_rs.set'.format(str_sub, idx_run))
+
+        return vec_abs_path
+
+    # TODO: get rid of the hardcoding of the dataset path convention
+    @staticmethod
+    def _absolute_path_to_eval(d_eval, str_sub, vec_idx_run):
+        """
+        Obtain the absolute path to the evaluation dataset
+
+
+        :param pathlib.Path d_eval: absolute path to the dataset with filename and extension
+        :param str str_sub: naming convention of the subject, e.g. 'sub11'
+        :param list vec_idx_run: list containing the indices of runs to be used for training the model, e.g. [1, 2, 3]
+
+        :return: a list of pathlib.Path objects holding the absolute path to all the individual runs of evaluation data
+        :rtype: list
+        """
+
+        vec_abs_path = []
+
+        for idx_run in vec_idx_run:
+            vec_abs_path.append(d_eval / str_sub / '{}_r0{}_rmbcg.set'.format(str_sub, idx_run))
 
         return vec_abs_path
 
@@ -265,9 +305,58 @@ class DefaultSession:
 
         self.end_epoch = len(self.m.epoch)
 
-    def predict(self):
-        raise NotImplementedError
+    def clean(self):
+        """
+        Clean all the dataset using the trained model
+        """
 
+        for i in range(len(self.vec_dataset)):
+            curr_dataset = self.vec_dataset[i]
+
+            curr_dataset.clean_dataset(self.session_model.model, self.vec_callbacks)
+
+    # TODO: fix the print command later...
+    def evaluate(self, mode='test'):
+        """
+        Evaluate the performance of the model on all dataset
+
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
+        power ratio from
+        """
+
+        print("\n#############################################")
+        print("#                  Results                  #")
+        print("#############################################\n")
+
+        for i in range(len(self.vec_dataset)):
+            curr_dataset = self.vec_dataset[i]
+
+            curr_dataset.evaluate_dataset(mode=mode)
+
+    # TODO: inherit the naming pattern from cfg
+    def save_model(self):
+        """
+        Save the trained model
+        """
+
+        f_model = "{}_{}".format(self.str_arch, time.strftime("%Y%m%d_%H%M%S"))
+        p_model = self.d_model / self.str_arch / self.str_sub / f_model
+        p_model.mkdir(parents=True, exist_ok=True)
+
+        self.session_model.save_model_weights(p_model, f_model, overwrite=self.overwrite)
+
+    # TODO: inherit the naming pattern from cfg
+    def save_data(self):
+        """
+        Save the cleaned time series
+        """
+
+        p_output = self.d_output / str_sub
+        for i in range(len(self.vec_dataset)):
+            curr_dataset = self.vec_dataset[i]
+            f_output = "{}_r0{}_bcgnet.mat".format(str_sub, self.vec_idx_run[i])
+
+            curr_dataset.save_data(p_output, f_output, self.overwrite)
 
 
 if __name__ == '__main__':
@@ -279,17 +368,24 @@ if __name__ == '__main__':
     settings.init(Path.home(), Path.home())  # Call only once
     d_root = Path(os.getcwd()).parent
     d_data = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_rs/')
+    d_obs = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_bcgobs/')
 
-    d_model = None
-    d_output = None
+    d_model = Path('/home/jyao/Downloads/')
+    d_output = Path('/home/jyao/Downloads/')
 
-    str_sub = 'sub12'
+    str_sub = 'sub11'
     vec_idx_run = [1, 2, 3, 4, 5]
 
     s1 = DefaultSession(d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch='gru_arch_001',
-                        lr=1e-3, batch_size=1, num_epochs=5, es_patience=25, es_min_delta=1e-5)
+                        d_eval=d_obs, str_eval='OBS',
+                        new_fs=100, lr=1e-3, batch_size=1, num_epochs=1, es_patience=25, es_min_delta=1e-5)
     s1.load_all_dataset()
     s1.prepare_training()
     s1.train()
+    s1.clean()
+    s1.evaluate(mode='test')
+
+    s1.save_model()
+    s1.save_data()
 
     print('nothing')
