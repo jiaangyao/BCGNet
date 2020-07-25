@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 
 from pathlib import Path
+from config import get_config
 from dataset import DefaultDataset
 from models import update_init
 from utils import temp_seed
@@ -14,36 +15,31 @@ from tensorflow.keras import callbacks
 
 
 class DefaultSession:
-    # TODO: figure out d_data from cfg
     # TODO: change all str_arch to str_model?
-    def __init__(self, d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch, d_eval=None, str_eval=None,
-                 new_fs=100, lr=1e-3, batch_size=1, num_epochs=2500, es_patience=25, es_min_delta=1e-5,
-                 cv_mode=False, random_seed=1997, verbose=2, overwrite=False, cfg=None):
-        self.cfg = cfg
-
-        self.d_root = d_root
-        self.d_data = d_data
-        self.d_model = d_model
-        self.d_output = d_output
-        self.d_eval = d_eval
+    def __init__(self, str_sub, vec_idx_run, str_arch, random_seed=1997, verbose=2, overwrite=False,
+                 cv_mode=False, cfg=None):
 
         self.str_sub = str_sub
         self.vec_idx_run = vec_idx_run
         self.str_arch = str_arch
-        self.str_eval = str_eval
-        self.new_fs = new_fs
-
-        self.lr = lr
-        self.batch_size = batch_size
-        self.num_epochs = num_epochs
-        self.es_patience = es_patience
-        self.es_min_delta = es_min_delta
-
         self.cv_mode = cv_mode
-
         self.random_seed = random_seed
         self.overwrite = overwrite
         self.verbose = verbose
+        self.cfg = cfg
+
+        self.d_root = cfg.d_root
+        self.d_data = cfg.d_data
+        self.d_model = cfg.d_model
+        self.d_output = cfg.d_output
+        self.d_eval = cfg.d_eval
+        self.str_eval = cfg.str_eval
+
+        self.batch_size = cfg.batch_size
+        self.lr = cfg.lr
+        self.num_epochs = cfg.num_epochs
+        self.es_patience = cfg.es_patience
+        self.es_min_delta = cfg.es_min_delta
 
         self.training_generator = None
         self.valid_generator = None
@@ -75,10 +71,10 @@ class DefaultSession:
 
                 curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
                                               d_eval=abs_eval_path, str_eval=self.str_eval,
-                                              new_fs=self.new_fs, random_seed=self.random_seed)
+                                              random_seed=self.random_seed, cfg=self.cfg)
             else:
                 curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
-                                              new_fs=self.new_fs, random_seed=self.random_seed)
+                                              random_seed=self.random_seed, cfg=self.cfg)
 
             curr_dataset.prepare_dataset()
             curr_dataset.split_dataset()
@@ -128,6 +124,7 @@ class DefaultSession:
         return vec_abs_path
 
     # TODO: clean this code up a little bit...
+    # TODO: figure out the dimension of input and output more intelligently
     def prepare_training(self):
         if not self.cv_mode:
 
@@ -351,41 +348,21 @@ class DefaultSession:
         Save the cleaned time series
         """
 
-        p_output = self.d_output / str_sub
+        p_output = self.d_output / self.str_sub
         for i in range(len(self.vec_dataset)):
             curr_dataset = self.vec_dataset[i]
-            f_output = "{}_r0{}_bcgnet.mat".format(str_sub, self.vec_idx_run[i])
+            f_output = "{}_r0{}_bcgnet.mat".format(self.str_sub, self.vec_idx_run[i])
 
             curr_dataset.save_data(p_output, f_output, self.overwrite)
+
+    # TODO: think about whether this is needed at all
+    def save_log(self):
+        """
+        Save the output
+
+        :return:
+        """
 
 
 if __name__ == '__main__':
     """ used for debugging """
-
-    import os
-    import settings
-
-    settings.init(Path.home(), Path.home())  # Call only once
-    d_root = Path(os.getcwd()).parent
-    d_data = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_rs/')
-    d_obs = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_bcgobs/')
-
-    d_model = Path('/home/jyao/Downloads/')
-    d_output = Path('/home/jyao/Downloads/')
-
-    str_sub = 'sub11'
-    vec_idx_run = [1, 2, 3, 4, 5]
-
-    s1 = DefaultSession(d_root, d_data, d_model, d_output, str_sub, vec_idx_run, str_arch='gru_arch_001',
-                        d_eval=d_obs, str_eval='OBS',
-                        new_fs=100, lr=1e-3, batch_size=1, num_epochs=1, es_patience=25, es_min_delta=1e-5)
-    s1.load_all_dataset()
-    s1.prepare_training()
-    s1.train()
-    s1.clean()
-    s1.evaluate(mode='test')
-
-    s1.save_model()
-    s1.save_data()
-
-    print('nothing')

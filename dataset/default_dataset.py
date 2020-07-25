@@ -4,7 +4,6 @@ import tensorflow as tf
 
 import scipy.io as sio
 from scipy.stats import median_absolute_deviation
-from settings import get_str_proc
 from utils import temp_seed
 from dataset import interpolate_raw_dataset, compute_rms
 
@@ -12,39 +11,62 @@ from dataset import interpolate_raw_dataset, compute_rms
 Each dataset object contains a single run of data from a single subject loaded by mne
 """
 
+# TODO: think about whether or not to implement cross validation mode
+
 
 class DefaultDataset:
     # TODO: check whether cfg is correctly used here and if it's correctly documented in the docstring
     # TODO: obtain the fields from the cfg object
-    def __init__(self, d_input, str_sub, idx_run, d_eval=None, str_eval=None, len_epoch=3, mad_threshold=5, new_fs=None,
-                 per_training=0.7, per_valid=0.15, per_test=0.15,
+    def __init__(self, d_input, str_sub, idx_run, d_eval=None, str_eval=None,
                  random_seed=1997, cv_mode=False, num_fold=None, cfg=None):
         """
         Load in the dataset and resample if needed
 
         :param pathlib.Path d_input: pathlib object containing absolute path to the single run of data
-        :param int new_fs: (optional) new desired sampling rate
-        :param object cfg: configuration
+        :param cfg: configuration file containing all the hyperparameter information
 
         """
 
-        self.cfg = cfg
-
-        # Load in the dataset
+        self.d_input = d_input
         self.str_sub = str_sub
         self.idx_run = idx_run
+        self.d_eval = d_eval
+        self.str_eval = str_eval
+        self.random_seed = random_seed
+        self.cv_mode = cv_mode
+        self.cfg = cfg
 
+        self.new_fs = cfg.new_fs
+        self.len_epoch = cfg.len_epoch
+        self.mad_threshold = cfg.mad_threshold
+        self.per_training = cfg.per_training
+        self.per_valid = cfg.per_valid
+        self.per_test = cfg.per_test
+
+        if self.per_training + self.per_valid + self.per_test > 1:
+            raise RuntimeError("Total percentage greater than 1")
+
+        # Load the various dataset
         self.raw_dataset = self._load_dataset(d_input)
         self.eval_dataset = None
-        self.str_eval = None
-        if d_eval is not None:
-            self.eval_dataset = self._load_dataset(d_eval)
+        if self.d_eval is not None:
+            self.eval_dataset = self._load_dataset(self.d_eval)
             self.str_eval = str_eval
-        self.fs = int(self.raw_dataset.info['sfreq'])
-        self.resampled = False
+        self.fs = self.raw_dataset.info['sfreq']
 
-        self.len_epoch = len_epoch
-        self.mad_threshold = mad_threshold
+        # Resample if needed
+        self.resampled = False
+        if self.new_fs is not None:
+            if self.new_fs != self.fs:
+                print("\nResample from {} Hz to {} Hz".format(self.fs, self.new_fs))
+                self.raw_dataset.resample(self.new_fs)
+
+                self.orig_fs = self.fs
+                self.orig_raw_dataset = self._load_dataset(d_input, verbose=False)
+                self.resampled = True
+
+                self.epoched_orig_cleaned_dataset = None
+                self.orig_cleaned_dataset = None
 
         self.standardized_dataset = None
         self.epoched_standardized_dataset = None
@@ -53,15 +75,6 @@ class DefaultDataset:
 
         self.epoched_cleaned_dataset = None
         self.cleaned_dataset = None
-
-        if per_training + per_valid + per_test > 1:
-            raise RuntimeError("Total percentage greater than 1")
-
-        self.per_training = per_training
-        self.per_valid = per_valid
-        self.per_test = per_test
-        self.random_seed = random_seed
-
         self.rms_results = {}
 
         self.cv_mode = cv_mode
@@ -80,25 +93,11 @@ class DefaultDataset:
             self.ys = None
             self.vec_idx_slice = None
 
-        # Resample if needed
-        if new_fs is not None:
-            if new_fs != self.fs:
-                print("\nResample from {} Hz to {} Hz".format(self.fs, new_fs))
-                self.raw_dataset.resample(new_fs)
-
-                self.orig_fs = self.fs
-                self.orig_raw_dataset = self._load_dataset(d_input, verbose=False)
-                self.resampled = True
-
-                self.epoched_orig_cleaned_dataset = None
-                self.orig_cleaned_dataset = None
-
         # TODO: delete the following snippet (since the user doesn't have any motion data)
         # TODO: put the channel names in a meta file somewhere
-        if get_str_proc() == 'proc_full':
-            self.raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
-            if self.resampled:
-                self.orig_raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
+        self.raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
+        if self.resampled:
+            self.orig_raw_dataset.drop_channels(['t0', 't1', 't2', 'r0', 'r1', 'r2'])
 
     @staticmethod
     def _load_dataset(d_run, **kwargs):
@@ -115,7 +114,6 @@ class DefaultDataset:
             run_dataset = mne.io.read_raw_eeglab(str(d_run), preload=True, **kwargs)
 
             return run_dataset
-
         else:
             raise RuntimeError("Invalid dataset")
 
@@ -388,16 +386,13 @@ class DefaultDataset:
 
     def split_dataset(self):
         if not self.cv_mode:
-            self.xs, self.ys, \
-                self.vec_idx_slice = DefaultDataset._generate_train_valid_test(self.epoched_standardized_dataset,
-                                                                               self.per_training, self.per_valid,
-                                                                               self.random_seed)
-
+            self.xs, self.ys, self.vec_idx_slice \
+                = DefaultDataset._generate_train_valid_test(self.epoched_standardized_dataset, self.per_training,
+                                                            self.per_valid, self.random_seed)
         else:
-            self.vec_xs, self.vec_ys, \
-                self.mat_idx_slice = DefaultDataset._generate_train_valid_test_cv(self.epoched_standardized_dataset,
-                                                                                  self.per_valid, self.num_fold,
-                                                                                  self.random_seed)
+            self.vec_xs, self.vec_ys, self.mat_idx_slice \
+                = DefaultDataset._generate_train_valid_test_cv(self.epoched_standardized_dataset, self.per_valid,
+                                                               self.num_fold, self.random_seed)
 
     @staticmethod
     def _generate_train_valid_test(epoched_dataset, per_training, per_valid, random_seed):
@@ -740,10 +735,10 @@ class DefaultDataset:
 
             vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,
                                       vec_epoched_eval_dataset=vec_epoched_eval_dataset,
-                                      str_eval=self.str_eval, mode=mode)
+                                      str_eval=self.str_eval, mode=mode, cfg=self.cfg)
         else:
             vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,
-                                      mode=mode)
+                                      mode=mode, cfg=self.cfg)
 
         self.rms_results[mode] = vec_rms_set
 
@@ -787,37 +782,3 @@ class DefaultDataset:
 
 if __name__ == '__main__':
     """ used for debugging """
-    from pathlib import Path
-    import settings
-
-    settings.init(Path.home(), Path.home())  # Call only once
-    str_sub = 'sub12'
-    idx_run = 5
-    d_ga_removed = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_rs/{}/{}_r0{}_rs.set'.format(str_sub,
-                                                                                                     str_sub, idx_run))
-    d_obs = Path('/home/jyao/Local/working_eegbcg/proc_full/proc_bcgobs/{}/{}_r0{}_rmbcg.set'.format(str_sub,
-                                                                                                     str_sub, idx_run))
-    dataset = DefaultDataset(d_ga_removed, str_sub, idx_run, d_eval=d_obs, str_eval='OBS', new_fs=100)
-    dataset.prepare_dataset()
-    dataset.split_dataset()
-
-    from models import gru_arch_001
-    from session import default_session
-    from tensorflow.keras import callbacks
-
-    p_weights = Path('/home/jyao/Downloads')
-    f_weights = 'model'
-    session_model = gru_arch_001()
-    session_model.init_model()
-    session_model.compile_model()
-
-    session_model.load_model_weights(p_weights, f_weights)
-
-    vec_callbacks = [callbacks.EarlyStopping(monitor='val_loss', min_delta=1e-5,
-                                             patience=25, verbose=0, mode='min',
-                                             restore_best_weights=True)]
-
-    dataset.clean_dataset(session_model.model, vec_callbacks)
-    dataset.evaluate_dataset('test')
-
-    print('nothing')

@@ -144,12 +144,12 @@ def tabulate_band(vec_f_avg_set, vec_pxx_avg_set, vec_str_dataset, cutoff_low, c
 
     print('Results for {} band'.format(str_band))
     print(tabulate(band_table, headers=['Type', 'Total Power', 'Ratio to Raw']))
+    print('')
 
 
-# TODO: inherit the band cutoff from the environmental file...
 # TODO: check on the underscore returns later...
 def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_dataset_set, epoched_eval_dataset_set=None,
-                                  str_eval=None):
+                                  str_eval=None, cfg=None):
     """
     Compute the power in each frequency band of interest and compute the power ratio
 
@@ -160,17 +160,18 @@ def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_datas
     :param mne.EpochsArray epoched_eval_dataset_set: (optional) dataset used for comparing performance provided by
         the user
     :param str str_eval: (optional) name of the method for the evaluation dataset
+    :param cfg: configuration file containing the band definitions
     """
 
     # Compute the power in each frequency band
-    cutoff_low_delta = 0.5
-    cutoff_high_delta = 4
+    cutoff_low_delta = cfg.cutoff_low_delta
+    cutoff_high_delta = cfg.cutoff_high_delta
 
-    cutoff_low_theta = 4
-    cutoff_high_theta = 8
+    cutoff_low_theta = cfg.cutoff_low_theta
+    cutoff_high_theta = cfg.cutoff_high_theta
 
-    cutoff_low_alpha = 8
-    cutoff_high_alpha = 13
+    cutoff_low_alpha = cfg.cutoff_low_alpha
+    cutoff_high_alpha = cfg.cutoff_high_alpha
 
     # Compute the mean PSD across all channels
     _, _, f_avg_raw_set, pxx_avg_raw_set = compute_psd(epoched_raw_dataset_set)
@@ -191,11 +192,9 @@ def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_datas
     tabulate_band(vec_f_avg_set, vec_pxx_avg_set, vec_str_dataset, cutoff_low_delta, cutoff_high_delta, 'Delta')
 
     # Compute the power in theta band
-    print('\n')
     tabulate_band(vec_f_avg_set, vec_pxx_avg_set, vec_str_dataset, cutoff_low_theta, cutoff_high_theta, 'Theta')
 
     # Compute the power in alpha band
-    print('\n')
     tabulate_band(vec_f_avg_set, vec_pxx_avg_set, vec_str_dataset, cutoff_low_alpha, cutoff_high_alpha, 'Alpha')
 
 
@@ -211,7 +210,9 @@ def compute_rms_epoched_dataset(epoched_raw_dataset_set, epoched_cleaned_dataset
     :param mne.io.RawArray epoched_eval_dataset_set: (optional) dataset used for comparing performance provided by
         the user
 
-    :return: a list [rms_raw, rms_cleaned] of RMS values from raw and cleaned datasets respectively
+    :return: a tuple rms_raw, rms_eval_eeg_data_set, rms_cleaned of RMS values from raw evaluation and cleaned datasets
+        respectively if evaluation set is provided and a tuple rms_raw, None, rms_cleaned if evaluation set
+        is not provided
     """
 
     # Obtain the set data for all three datasets and change unit to micro V
@@ -236,18 +237,19 @@ def compute_rms_epoched_dataset(epoched_raw_dataset_set, epoched_cleaned_dataset
         rms_eval_eeg_data_set = np.sqrt(np.square(epoched_eval_eeg_data_set).mean())
 
         # return the RMS value
-        vec_rms_set = [rms_raw_eeg_data_set, rms_eval_eeg_data_set, rms_cleaned_eeg_data_set]
+        vec_rms_set = rms_raw_eeg_data_set, rms_eval_eeg_data_set, rms_cleaned_eeg_data_set
 
         return vec_rms_set
 
     # return the RMS value
-    vec_rms_set = [rms_raw_eeg_data_set, rms_cleaned_eeg_data_set]
+    vec_rms_set = rms_raw_eeg_data_set, None, rms_cleaned_eeg_data_set
 
     return vec_rms_set
 
 
+# TODO: fix the print command here
 def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  vec_epoched_eval_dataset=None,
-                str_eval=None, mode='test'):
+                str_eval=None, mode='test', cfg=None):
     """
     Split epoched dataset and compute the RMS value.
 
@@ -261,7 +263,7 @@ def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  
     :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
         power ratio from
 
-    :return: a list of RMS values from raw, evaluation and cleaned dataset if eval is given and from raw, and
+    :return: a tuple of RMS values from raw, evaluation and cleaned dataset if eval is given and from raw, and
         cleaned dataset if not
     """
 
@@ -294,20 +296,19 @@ def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  
         tabulate_band_power_reduction(epoched_raw_dataset_set=epoched_raw_dataset_set,
                                       epoched_eval_dataset_set=epoched_eval_dataset_set,
                                       epoched_cleaned_dataset_set=epoched_cleaned_dataset_set,
-                                      str_eval=str_eval)
+                                      str_eval=str_eval, cfg=cfg)
 
     else:
         vec_rms_set = compute_rms_epoched_dataset(epoched_raw_dataset_set, epoched_cleaned_dataset_set)
 
         print("RMS VALUES: RUN {}, {} SET".format(idx_run, mode.upper()))
         print("RMS Raw: {}".format(vec_rms_set[0]))
-        print("RMS BCGNet: {}".format(vec_rms_set[1]))
+        print("RMS BCGNet: {}".format(vec_rms_set[2]))
 
         # Compute the reduction in each power band
         print("\nFREQUENCY BAND POWER REDUCTION: RUN {}".format(idx_run))
-        tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_dataset_set)
-
-    print('\n\n')
+        tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_dataset_set, cfg=cfg)
+    print('________________________________________\n')
 
     return vec_rms_set
 

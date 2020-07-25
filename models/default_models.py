@@ -33,9 +33,8 @@ class NNModel:
         self.model.trainable = True
 
 
-# TODO: get rid of the feature extract opt
 class RNNModel(NNModel):
-    def __init__(self, n_input=1, n_output=63, lr=1e-3, opt_type='adam', opt_feature_extract=None, **kwargs):
+    def __init__(self, n_input=1, n_output=63, lr=1e-3, opt_type='adam', **kwargs):
         """
         Constructor for RNN model
 
@@ -43,7 +42,6 @@ class RNNModel(NNModel):
         :param int n_output: number of output (number of EEG channels)
         :param float lr: learning rate
         :param str opt_type: chosen type of optimizer, allowed to be adam, rmsprop or sgd
-        :param object opt_feature_extract: option object from feature extraction step
         :param kwargs: clipnorm: normalized value for gradient clipping
                        clipvalue: numerical value for gradient clipping
 
@@ -58,7 +56,6 @@ class RNNModel(NNModel):
         self.opt_type = opt_type.lower()
         self.n_input = n_input
         self.n_output = n_output
-        self.opt_feature_extract = opt_feature_extract
 
         K.set_floatx('float64')
 
@@ -81,14 +78,13 @@ class RNNModel(NNModel):
         """
 
         if int(tf.__version__[0]) > 1:
-            self.model = self._model_tf_v2(self.n_input, self.n_output, self.opt_feature_extract)
+            self.model = self._model_tf_v2(self.n_input, self.n_output)
 
         else:
-            self.model = self._model_tf_v1(self.n_input, self.n_output, self.opt_feature_extract)
+            self.model = self._model_tf_v1(self.n_input, self.n_output)
 
-    # TODO: implement compatibility check with opt_feature_extract
     @staticmethod
-    def _model_tf_v2(n_input, n_output, opt_feature_extract):
+    def _model_tf_v2(n_input, n_output):
         """
         Initialize the tensorflow 2.X version of the model
 
@@ -110,7 +106,6 @@ class RNNModel(NNModel):
 
         :param int n_input: number of input dimensions (number of ECG + aux channels)
         :param int n_output: number of output (number of EEG channels)
-        :param object opt_feature_extract: option object from feature extraction step
 
         :return: initialized model
         """
@@ -151,16 +146,14 @@ class RNNModel(NNModel):
 
         return model
 
-    # TODO: implement compatibility check with opt_feature_extract
     @staticmethod
-    def _model_tf_v1(n_input, n_output, opt_feature_extract):
+    def _model_tf_v1(n_input, n_output):
         """
 
         Initialize the tensorflow 1.1X version of the model
 
         :param int n_input: number of input dimensions (number of ECG + aux channels)
         :param int n_output: number of output (number of EEG channels)
-        :param object opt_feature_extract: option object from feature extraction step
 
         :return: initialized model
         """

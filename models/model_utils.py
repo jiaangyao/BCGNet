@@ -13,11 +13,11 @@ def update_init(dest_dir):
 
         if os.name == 'nt':
             attribute = win32api.GetFileAttributes(f_file)
-            bool_hidden = attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
+            is_hidden = attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
         else:
-            bool_hidden = f_file.startswith('.')
+            is_hidden = f_file.startswith('.')
 
-        if not bool_hidden:
+        if not is_hidden:
             vec_f_file.append(f_file)
 
     if "__init__" in vec_f_file:

@@ -7,13 +7,13 @@ from os.path import basename, splitext
 
 
 class gru_arch_001(RNNModel):
-    def __init__(self, n_input=1, n_output=63, lr=1e-2, opt_type='adam', opt_feature_extract=None, **kwargs):
+    def __init__(self, n_input=1, n_output=63, lr=1e-2, opt_type='adam', **kwargs):
         """
         See documentation of rnn_model in default_models
         If needed can add new instance variables
 
         """
-        super(gru_arch_001, self).__init__(n_input, n_output, lr, opt_type, opt_feature_extract, **kwargs)
+        super(gru_arch_001, self).__init__(n_input, n_output, lr, opt_type, **kwargs)
 
         self.name = splitext(basename(__file__))[0]
 
@@ -24,7 +24,7 @@ class gru_arch_001(RNNModel):
 
     # for TF 2.X
     @staticmethod
-    def _model_tf_v2(n_input, n_output, opt_feature_extract):
+    def _model_tf_v2(n_input, n_output):
         from tensorflow.keras.layers import Input, Dense, Dropout, Bidirectional, GRU
         from tensorflow.keras.regularizers import l1, l2
 

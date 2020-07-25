@@ -1,0 +1,77 @@
+##############################################################################
+#### Path definition
+##############################################################################
+
+# Need to provide the absolute path to the various input dataset and
+# to desired directories for saving the output
+
+d_data: '/home/jyao/Local/working_eegbcg/proc_full/proc_rs/'
+d_model: '/home/jyao/Downloads/'
+d_output: '/home/jyao/Downloads/'
+
+# (Optional) to be provided if want to compare against another
+# preprocessing method
+d_eval: '/home/jyao/Local/working_eegbcg/proc_full/proc_bcgobs/'
+str_eval: 'OBS'
+
+# Hyperparameters below worked well for our tasks in
+# McIntosh et al. IEEE Trans Biomed Engi
+# https://ieeexplore.ieee.org/document/9124646
+
+##############################################################################
+#### Preprocessing variables
+##############################################################################
+
+# New sampling rate to downsample the dataset into
+new_fs: 100
+
+# length of data in seconds to split into each epoch
+# which is fed into the network as a single sample
+len_epoch: 3
+
+# n times the median absolute deviation to be used
+# as the threshold for outlier rejection
+mad_threshold: 5
+
+# percentage of all epochs in the training set
+per_training: 0.7
+
+# percentage of all epochs in the validation set
+per_valid: 0.15
+
+# percentage of all epochs in the test set
+per_test: 0.15
+
+##############################################################################
+#### Model hyperparamters
+##############################################################################
+# maximum number of training epochs (iterations)
+# used in training the model
+num_epochs: 2500
+
+# learning rate for training the model
+lr: 0.001
+
+# batch size for training the model
+batch_size: 1
+
+# number of epochs over which improvement is
+# evaluated for early stopping
+es_patience: 25
+
+# minimum change between loss values from epoch
+# to epoch to be considered improvement
+es_min_delta: 0.00001
+
+##############################################################################
+#### EEG hyperparamters
+##############################################################################
+# Define all the frequency bands
+cutoff_low_delta: 0.5
+cutoff_high_delta: 4
+
+cutoff_low_theta: 4
+cutoff_high_theta: 8
+
+cutoff_low_alpha: 8
+cutoff_high_alpha: 13
