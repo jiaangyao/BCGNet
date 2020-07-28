@@ -16,7 +16,7 @@ Each dataset object contains a single run of data from a single subject loaded b
 
 class DefaultDataset:
     # TODO: check whether cfg is correctly used here and if it's correctly documented in the docstring
-    # TODO: obtain the fields from the cfg object
+    # TODO: clean up the instance variable definition a little bit in the end
     def __init__(self, d_input, str_sub, idx_run, d_eval=None, str_eval=None,
                  random_seed=1997, cv_mode=False, num_fold=None, cfg=None):
         """
@@ -83,7 +83,12 @@ class DefaultDataset:
             self.vec_ys = None
             self.mat_idx_slice = None
 
-            if cv_mode is not None:
+            self.vec_epoched_orig_cleaned_dataset = None
+            self.vec_orig_cleaned_dataset = None
+            self.vec_epoched_cleaned_dataset = None
+            self.vec_cleaned_dataset = None
+
+            if num_fold is not None:
                 self.num_fold = num_fold
             else:
                 self.num_fold = int(np.round(1 / self.per_test))
@@ -497,6 +502,7 @@ class DefaultDataset:
 
         return vec_epoched_dataset
 
+    # TODO: maybe change per_validation to be same as 1/num_fold
     @staticmethod
     def _generate_train_valid_test_cv(epoched_dataset, per_valid, num_fold, random_seed):
         """
@@ -556,7 +562,7 @@ class DefaultDataset:
                 epocehd_data_valid = epoched_data[vec_idx_valid, :, :]
 
                 # Obtain the training epochs
-                vec_idx_training = vec_idx_tv[num_valid:]
+                vec_idx_training = permuted_vec_tv[num_valid:]
                 epocehd_data_training = epoched_data[vec_idx_training, :, :]
 
                 # test for overlap
@@ -598,17 +604,17 @@ class DefaultDataset:
         """
 
         if self.resampled:
-            self.epoched_orig_cleaned_dataset, self.orig_cleaned_dataset, _, \
-                _ = self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
-                                                           orig_raw_dataset=self.orig_raw_dataset,
-                                                           standardized_dataset=self.standardized_dataset,
-                                                           raw_dataset=self.raw_dataset,
-                                                           resampled=self.resampled,
-                                                           ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
-                                                           len_epoch=self.len_epoch,
-                                                           vec_idx_good_epochs=self.vec_idx_good_epochs)
+            self.epoched_orig_cleaned_dataset, self.orig_cleaned_dataset, _, _ \
+                = self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
+                                      orig_raw_dataset=self.orig_raw_dataset,
+                                      standardized_dataset=self.standardized_dataset,
+                                      raw_dataset=self.raw_dataset,
+                                      resampled=self.resampled,
+                                      ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
+                                      len_epoch=self.len_epoch,
+                                      vec_idx_good_epochs=self.vec_idx_good_epochs)
         else:
-            self.epoched_cleaned_dataset, self.cleaned_dataset = \
+            _, _, self.epoched_cleaned_dataset, self.cleaned_dataset = \
                 self._clean_dataset(model=model, vec_callbacks=vec_callbacks,
                                     standardized_dataset=self.standardized_dataset,
                                     raw_dataset=self.raw_dataset,
@@ -621,9 +627,62 @@ class DefaultDataset:
         self.standardized_dataset = None
         self.epoched_standardized_dataset = None
 
+    # TODO: reconsider the _ variables here.... as well as the standardized data...
+    def clean_dataset_cv(self, vec_model, vec_callbacks=None):
+        """
+        generate the cleaned datasets using provided model and callback objetcs
+
+        :param list vec_model: list of keras model that was trained
+        :param list vec_callbacks: (optional) a list containing the early stopping object used during training
+            (only relevant if TF 2.X is used)
+        """
+
+        if self.resampled:
+            vec_epoched_orig_cleaned_dataset = []
+            vec_orig_cleaned_dataset = []
+
+            for i in range(len(vec_model)):
+                epoched_orig_cleaned_dataset, orig_cleaned_dataset, _, _ \
+                    = self._clean_dataset(model=vec_model[i], vec_callbacks=vec_callbacks,
+                                          orig_raw_dataset=self.orig_raw_dataset,
+                                          standardized_dataset=self.standardized_dataset,
+                                          raw_dataset=self.raw_dataset,
+                                          resampled=self.resampled,
+                                          ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
+                                          len_epoch=self.len_epoch,
+                                          vec_idx_good_epochs=self.vec_idx_good_epochs)
+
+                vec_epoched_orig_cleaned_dataset.append(epoched_orig_cleaned_dataset)
+                vec_orig_cleaned_dataset.append(orig_cleaned_dataset)
+
+            self.vec_epoched_orig_cleaned_dataset = vec_epoched_orig_cleaned_dataset
+            self.vec_orig_cleaned_dataset = vec_orig_cleaned_dataset
+        else:
+            vec_epoched_cleaned_dataset = []
+            vec_cleaned_dataset = []
+
+            for i in range(len(vec_model)):
+                _, _, epoched_cleaned_dataset, cleaned_dataset = \
+                    self._clean_dataset(model=vec_model[i], vec_callbacks=vec_callbacks,
+                                        standardized_dataset=self.standardized_dataset,
+                                        raw_dataset=self.raw_dataset,
+                                        resampled=self.resampled,
+                                        ecg_stats=self.ecg_stats, eeg_stats=self.eeg_stats,
+                                        len_epoch=self.len_epoch,
+                                        vec_idx_good_epochs=self.vec_idx_good_epochs)
+                vec_epoched_cleaned_dataset.append(epoched_cleaned_dataset)
+                vec_cleaned_dataset.append(cleaned_dataset)
+
+            self.vec_epoched_cleaned_dataset = vec_epoched_cleaned_dataset
+            self.vec_cleaned_dataset = vec_cleaned_dataset
+
+        # clean up the standardized data instance variables to save memory
+        self.standardized_dataset = None
+        self.epoched_standardized_dataset = None
+
     @staticmethod
     def _clean_dataset(model, vec_callbacks, standardized_dataset, raw_dataset, resampled,
-                         ecg_stats, eeg_stats, len_epoch, vec_idx_good_epochs, orig_raw_dataset=None):
+                       ecg_stats, eeg_stats, len_epoch, vec_idx_good_epochs, orig_raw_dataset=None):
         """
         Generates the unstandardized ECG and predicted BCG time series
 
@@ -644,7 +703,7 @@ class DefaultDataset:
             where epoched_orig_cleaned_dataset and orig_cleaned_dataset are the epoched and time series version
             of cleaned data interpolated to original sampling rate and epoched_cleaned_dataset, cleaned_dataset
             are epoched and time series version of cleaned data with the resampled sampling rate or a tuple
-            (epoched_cleaned_dataset, cleaned_dataset) is no resampling was performed
+            (None, None, epoched_cleaned_dataset, cleaned_dataset) is no resampling was performed
         """
 
         # Obtain the normalized raw data and the info object holding the channel information
@@ -705,7 +764,7 @@ class DefaultDataset:
 
             return epoched_orig_cleaned_dataset, orig_cleaned_dataset, epoched_cleaned_dataset, cleaned_dataset
 
-        return epoched_cleaned_dataset, cleaned_dataset
+        return None, None, epoched_cleaned_dataset, cleaned_dataset
 
     def evaluate_dataset(self, mode='test'):
         """
@@ -742,42 +801,113 @@ class DefaultDataset:
 
         self.rms_results[mode] = vec_rms_set
 
-    def save_dataset(self, p_output, f_output, overwrite, **kwargs):
+    def evaluate_dataset_cv(self, idx_fold, mode='test'):
+        """
+        Evaluate the performance of the model compared to raw and optional evaluation dataset and package all results
+        into a dictionary for the cross validation mode
+
+        :param int idx_fold: index of the fold (0 indexing)
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
+        power ratio from
+        """
+
+        if self.resampled:
+            vec_epoched_raw_dataset_tvt = DefaultDataset._split_epoched_dataset(self.epoched_orig_raw_dataset,
+                                                                                self.mat_idx_slice[idx_fold])
+
+            vec_epoched_cleaned_dataset_tvt = \
+                DefaultDataset._split_epoched_dataset(self.vec_epoched_orig_cleaned_dataset[idx_fold],
+                                                      self.mat_idx_slice[idx_fold])
+        else:
+            vec_epoched_raw_dataset_tvt = DefaultDataset._split_epoched_dataset(self.epoched_raw_dataset,
+                                                                                self.mat_idx_slice[idx_fold])
+
+            vec_epoched_cleaned_dataset_tvt = \
+                DefaultDataset._split_epoched_dataset(self.vec_epoched_cleaned_dataset[idx_fold],
+                                                      self.mat_idx_slice[idx_fold])
+
+        if self.eval_dataset is not None:
+            vec_epoched_eval_dataset_tvt = DefaultDataset._split_epoched_dataset(self.epoched_eval_dataset,
+                                                                                 self.mat_idx_slice[idx_fold])
+
+            vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset_tvt, vec_epoched_cleaned_dataset_tvt,
+                                      vec_epoched_eval_dataset=vec_epoched_eval_dataset_tvt,
+                                      str_eval=self.str_eval, mode=mode, cfg=self.cfg)
+        else:
+            vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset_tvt, vec_epoched_cleaned_dataset_tvt,
+                                      mode=mode, cfg=self.cfg)
+
+        if idx_fold not in self.rms_results:
+            fold_rms_results = {mode: vec_rms_set}
+            self.rms_results[idx_fold] = fold_rms_results
+        else:
+            self.rms_results[idx_fold][mode] = vec_rms_set
+
+    def save_dataset(self, p_output, f_output, overwrite=False, idx_fold=None, **kwargs):
         """
         Save the processed dataset in Neuromag .fif format
 
         :param pathlib.Path p_output: directory to save the dataset into
         :param str f_output: filename of the saved dataset
-        :param overwrite: whether or not to overwrite any existing files
+        :param boolean overwrite: whether or not to overwrite any existing files
+        :param int idx_fold: (optional) index of the current fold (0 indexing)
         :param kwargs: other arguments that are accepted by mne.io.Raw.save() function
         """
-        if self.resampled:
-            self.orig_cleaned_dataset.save(fname=str(p_output / f_output), overwrite=overwrite, **kwargs)
-        else:
-            self.cleaned_dataset.save(fname=str(p_output / f_output), overwrite=overwrite, **kwargs)
 
-    def save_data(self, p_output, f_output, overwrite, **kwargs):
+        # make output directory if not exist already
+        if idx_fold is not None:
+            p_output_curr = p_output / 'fold{}'.format(idx_fold)
+        else:
+            p_output_curr = p_output
+        p_output_curr.mkdir(parents=True, exist_ok=True)
+
+        if idx_fold is not None:
+            if self.resampled:
+                self.vec_orig_cleaned_dataset[idx_fold].save(fname=str(p_output_curr / f_output),
+                                                             overwrite=overwrite, **kwargs)
+            else:
+                self.vec_cleaned_dataset[idx_fold].save(fname=str(p_output_curr / f_output),
+                                                        overwrite=overwrite, **kwargs)
+        else:
+            if self.resampled:
+                self.orig_cleaned_dataset.save(fname=str(p_output_curr / f_output), overwrite=overwrite, **kwargs)
+            else:
+                self.cleaned_dataset.save(fname=str(p_output_curr / f_output), overwrite=overwrite, **kwargs)
+
+    def save_data(self, p_output, f_output, overwrite=False, idx_fold=None, **kwargs):
         """
         Save the processed data in MATLAB .mat format
 
         :param pathlib.Path p_output: directory to save the dataset into
         :param str f_output: filename of the saved dataset
-        :param overwrite: whether or not to overwrite any existing files
+        :param boolean overwrite: whether or not to overwrite any existing files
+        :param int idx_fold: (optional) index of the current fold (0 indexing)
         :param kwargs: other keyword arguments accepted by the sio.savemat() function
         """
 
         # make output directory if not exist already
-        p_output.mkdir(exist_ok=True, parents=True)
+        if idx_fold is not None:
+            p_output_curr = p_output / 'fold{}'.format(idx_fold)
+        else:
+            p_output_curr = p_output
+        p_output_curr.mkdir(exist_ok=True, parents=True)
 
         # Obtain the data
-        if self.resampled:
-            cleaned_data = self.orig_cleaned_dataset.get_data()
+        if idx_fold is not None:
+            if self.resampled:
+                cleaned_data = self.vec_orig_cleaned_dataset[idx_fold].get_data()
+            else:
+                cleaned_data = self.vec_cleaned_dataset[idx_fold].get_data()
+
         else:
-            cleaned_data = self.cleaned_dataset.get_data()
+            if self.resampled:
+                cleaned_data = self.orig_cleaned_dataset.get_data()
+            else:
+                cleaned_data = self.cleaned_dataset.get_data()
 
         # Save the dataset
-        if overwrite or (p_output / f_output).exists() is False:
-            sio.savemat(str(p_output / f_output), {'data': cleaned_data}, **kwargs)
+        if overwrite or (p_output_curr / f_output).exists() is False:
+            sio.savemat(str(p_output_curr / f_output), {'data': cleaned_data}, **kwargs)
 
 
 if __name__ == '__main__':

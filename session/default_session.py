@@ -1,10 +1,7 @@
-import os
 import time
 import tensorflow as tf
 import numpy as np
 
-from pathlib import Path
-from config import get_config
 from dataset import DefaultDataset
 from models import update_init
 from utils import temp_seed
@@ -17,7 +14,7 @@ from tensorflow.keras import callbacks
 class DefaultSession:
     # TODO: change all str_arch to str_model?
     def __init__(self, str_sub, vec_idx_run, str_arch, random_seed=1997, verbose=2, overwrite=False,
-                 cv_mode=False, cfg=None):
+                 cv_mode=False, num_fold=None, cfg=None):
 
         self.str_sub = str_sub
         self.vec_idx_run = vec_idx_run
@@ -27,6 +24,11 @@ class DefaultSession:
         self.overwrite = overwrite
         self.verbose = verbose
         self.cfg = cfg
+
+        if self.cv_mode and num_fold is None:
+            self.num_fold = int(np.round(1 / cfg.per_test))
+        else:
+            self.num_fold = num_fold
 
         self.d_root = cfg.d_root
         self.d_data = cfg.d_data
@@ -41,19 +43,32 @@ class DefaultSession:
         self.es_patience = cfg.es_patience
         self.es_min_delta = cfg.es_min_delta
 
-        self.training_generator = None
-        self.valid_generator = None
-        self.test_generator = None
-        self.vec_callbacks = None
-
         self.vec_dataset = []
-        self.session_xs = None
-        self.session_ys = None
-        self.vec_idx_permute = None
-        self.session_model = None
+        if cv_mode:
+            self.vec_session_xs = None
+            self.vec_session_ys = None
+            self.mat_idx_permute = None
+            self.vec_session_model = None
 
-        self.m = None
-        self.end_epoch = None
+            self.vec_training_generator = None
+            self.vec_valid_generator = None
+            self.vec_test_generator = None
+
+            self.vec_m = None
+            self.vec_end_epoch = None
+        else:
+            self.session_xs = None
+            self.session_ys = None
+            self.vec_idx_permute = None
+            self.session_model = None
+
+            self.training_generator = None
+            self.valid_generator = None
+            self.test_generator = None
+
+            self.m = None
+            self.end_epoch = None
+        self.vec_callbacks = None
 
     def load_all_dataset(self):
         # Obtain the absolute path to all dataset for a given subject
@@ -71,10 +86,14 @@ class DefaultSession:
 
                 curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
                                               d_eval=abs_eval_path, str_eval=self.str_eval,
-                                              random_seed=self.random_seed, cfg=self.cfg)
+                                              random_seed=self.random_seed,
+                                              cv_mode=self.cv_mode, num_fold=self.num_fold,
+                                              cfg=self.cfg)
             else:
                 curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
-                                              random_seed=self.random_seed, cfg=self.cfg)
+                                              random_seed=self.random_seed,
+                                              cv_mode=self.cv_mode, num_fold=self.num_fold,
+                                              cfg=self.cfg)
 
             curr_dataset.prepare_dataset()
             curr_dataset.split_dataset()
@@ -128,10 +147,12 @@ class DefaultSession:
     def prepare_training(self):
         if not self.cv_mode:
 
+            # initialize the model
             self.session_model = self._init_model(d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
             self.session_model.init_model()
             self.session_model.compile_model()
 
+            # obtain the training, validation and test sets and initialize the generators
             self.session_xs, self.session_ys, self.vec_idx_permute = self._combine_from_runs(self.vec_dataset,
                                                                                              self.random_seed)
             self.training_generator = DefaultGenerator(self.session_xs[0], self.session_ys[0],
@@ -143,10 +164,46 @@ class DefaultSession:
             self.test_generator = DefaultGenerator(self.session_xs[2], self.session_ys[2],
                                                    batch_size=1, shuffle=False)
 
+            # initialize the list of callbacks during training
             self.vec_callbacks = DefaultSession._get_callback(self.es_patience, self.es_min_delta)
 
         else:
-            pass
+            # initialize the list of models
+            vec_session_model = []
+            for i in range(self.num_fold):
+                fold_model = self._init_model(d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
+                fold_model.init_model()
+                fold_model.compile_model()
+
+                vec_session_model.append(fold_model)
+            self.vec_session_model = vec_session_model
+
+            # initialize the list of training, validation and test sets and initialize the generators
+            self.vec_session_xs, self.vec_session_ys, self.mat_idx_permute = \
+                DefaultSession._combine_from_runs_cv(self.vec_dataset, self.num_fold, self.random_seed)
+
+            vec_training_generator = []
+            vec_valid_generator = []
+            vec_test_generator = []
+            for i in range(self.num_fold):
+                training_generator = DefaultGenerator(self.vec_session_xs[i][0], self.vec_session_ys[i][0],
+                                                      batch_size=self.batch_size, shuffle=True)
+
+                valid_generator = DefaultGenerator(self.vec_session_xs[i][1], self.vec_session_ys[i][1],
+                                                   batch_size=1, shuffle=False)
+
+                test_generator = DefaultGenerator(self.vec_session_xs[i][2], self.vec_session_ys[i][2],
+                                                  batch_size=1, shuffle=False)
+
+                vec_training_generator.append(training_generator)
+                vec_valid_generator.append(valid_generator)
+                vec_test_generator.append(test_generator)
+            self.vec_training_generator = vec_training_generator
+            self.vec_valid_generator = vec_valid_generator
+            self.vec_test_generator = vec_test_generator
+
+            # initialize the list of callbacks during training
+            self.vec_callbacks = DefaultSession._get_callback(self.es_patience, self.es_min_delta)
 
     @staticmethod
     def _init_model(d_root, str_arch=None, lr=1e-3):
@@ -194,7 +251,38 @@ class DefaultSession:
 
         :param list vec_dataset: list of dataset objects where each object holds raw and precessed data from
             a single run
-        :param random_seed: the random seed used in the experiment for replicable splitting of the dataset
+        :param int random_seed: the random seed used in the experiment for replicable splitting of the dataset
+
+        :return: a tuple (session_xs, session_ys, vec_idx_permute), where session_xs is a list containing all the
+            ECG data from all runs in the form of [x_train, x_validation, x_test] and each has
+            shape (epoch, channel, data), where session_ys is a list containing all the
+            corrupted EEG data in the form of [y_train, y_validation, y_test], and each has shape
+            (epoch, channel, data) and vec_idx_permute containing the order of the random permutation when
+            combining the epochs from each individual dataset
+        """
+
+        vec_xs = []
+        vec_ys = []
+
+        for curr_dataset in vec_dataset:
+            vec_xs.append(curr_dataset.xs)
+            vec_ys.append(curr_dataset.ys)
+
+        session_xs, session_ys, vec_idx_permute = DefaultSession._concatenate_all_sets(vec_xs, vec_ys, random_seed)
+
+        return session_xs, session_ys, vec_idx_permute
+
+    @staticmethod
+    def _concatenate_all_sets(vec_xs, vec_ys, random_seed):
+        """
+        Combines the training, validation and test sets from all individual runs
+
+        :param list vec_xs: a list of individual xs from each run of data, where each xs is the list containing all
+            the ECG data in the form of [x_train, x_validation, x_test] and each has shape (epoch, channel, data)
+        :param list vec_ys: a list of individual ys from each run of data, where each ys is a list containing all the
+            corrupted EEG data in the form of [y_train, y_validation, y_test], and each has shape
+            (epoch, channel, data)
+        :param int random_seed: the random seed used in the experiment for replicable splitting of the dataset
 
         :return: a tuple (session_xs, session_ys, vec_idx_permute), where session_xs is a list containing all the
             ECG data from all runs in the form of [x_train, x_validation, x_test] and each has
@@ -212,9 +300,9 @@ class DefaultSession:
         vec_session_y_valid = []
         vec_session_y_test = []
 
-        for curr_dataset in vec_dataset:
-            curr_xs = curr_dataset.xs
-            curr_ys = curr_dataset.ys
+        for i in range(len(vec_xs)):
+            curr_xs = vec_xs[i]
+            curr_ys = vec_ys[i]
 
             vec_session_x_training.append(curr_xs[0])
             vec_session_x_valid.append(curr_xs[1])
@@ -252,17 +340,38 @@ class DefaultSession:
         return session_xs, session_ys, vec_idx_permute
 
     # TODO: finish documentation
-    # TODO: finish implementation using the non-CV version of the script
     @staticmethod
-    def _combine_from_runs_cv(vec_dataset):
+    def _combine_from_runs_cv(vec_dataset, num_fold, random_seed):
         """
 
 
         :param vec_dataset:
+        :param num_fold
+        :param random_seed
         :return:
         """
 
-        raise NotImplementedError
+        vec_session_xs = []
+        vec_session_ys = []
+        mat_idx_permute = []
+
+        # loop through all the folds
+        for i in range(num_fold):
+            vec_xs = []
+            vec_ys = []
+
+            # loop through all runs in each fold
+            for curr_dataset in vec_dataset:
+                vec_xs.append(curr_dataset.vec_xs[i])
+                vec_ys.append(curr_dataset.vec_ys[i])
+
+            session_xs, session_ys, vec_idx_permute = DefaultSession._concatenate_all_sets(vec_xs, vec_ys, random_seed)
+
+            vec_session_xs.append(session_xs)
+            vec_session_ys.append(session_ys)
+            mat_idx_permute.append(vec_idx_permute)
+
+        return vec_session_xs, vec_session_ys, mat_idx_permute
 
     @staticmethod
     def _get_callback(es_patience=25, es_min_delta=1e-5, verbose=0, **kwargs):
@@ -274,7 +383,7 @@ class DefaultSession:
         :param int/float es_min_delta: lower bound for epoch to be considered improvement
         :param int verbose: verbosity
         :param kwargs: additional keyword arguments for keras.callbacks.EarlyStopping
-\
+
         :return: a list containing the early stopping object defined with input parameters
         """
 
@@ -289,28 +398,58 @@ class DefaultSession:
         """
         initiate training
         """
+        if not self.cv_mode:
+            if int(tf.__version__[0]) > 1:
+                self.m = self.session_model.model.fit(x=self.training_generator, epochs=self.num_epochs,
+                                                      verbose=self.verbose, callbacks=self.vec_callbacks,
+                                                      validation_data=self.valid_generator)
 
-        if int(tf.__version__[0]) > 1:
-            self.m = self.session_model.model.fit(x=self.training_generator, epochs=self.num_epochs,
-                                                  verbose=self.verbose, callbacks=self.vec_callbacks,
-                                                  validation_data=self.valid_generator)
+            else:
+                self.m = self.session_model.model.fit_generator(generator=self.training_generator,
+                                                                epochs=self.num_epochs,
+                                                                verbose=self.verbose, callbacks=self.vec_callbacks,
+                                                                validation_data=self.valid_generator)
 
+            self.end_epoch = len(self.m.epoch)
         else:
-            self.m = self.session_model.model.fit_generator(generator=self.training_generator, epochs=self.num_epochs,
-                                                            verbose=self.verbose, callbacks=self.vec_callbacks,
-                                                            validation_data=self.valid_generator)
+            vec_m = []
+            vec_end_epoch = []
+            for i in range(self.num_fold):
+                print('\n\nTraining the {}-th fold'.format(i + 1))
 
-        self.end_epoch = len(self.m.epoch)
+                if int(tf.__version__[0]) > 1:
+                    m = self.vec_session_model[i].model.fit(x=self.vec_training_generator[i], epochs=self.num_epochs,
+                                                            verbose=self.verbose, callbacks=self.vec_callbacks,
+                                                            validation_data=self.vec_valid_generator[i])
+
+                else:
+                    m = self.vec_session_model[i].model.fit_generator(generator=self.vec_training_generator[i],
+                                                                      epochs=self.num_epochs, verbose=self.verbose,
+                                                                      callbacks=self.vec_callbacks,
+                                                                      validation_data=self.vec_valid_generator[i])
+                vec_m.append(m)
+                vec_end_epoch.append(len(m.epoch))
+            self.vec_m = vec_m
+            self.vec_end_epoch = vec_end_epoch
 
     def clean(self):
         """
         Clean all the dataset using the trained model
         """
+        if not self.cv_mode:
+            for i in range(len(self.vec_dataset)):
+                curr_dataset = self.vec_dataset[i]
 
-        for i in range(len(self.vec_dataset)):
-            curr_dataset = self.vec_dataset[i]
+                curr_dataset.clean_dataset(self.session_model.model, self.vec_callbacks)
+        else:
+            vec_models = []
+            for i in range(self.num_fold):
+                vec_models.append(self.vec_session_model[i].model)
 
-            curr_dataset.clean_dataset(self.session_model.model, self.vec_callbacks)
+            for i in range(len(self.vec_dataset)):
+                curr_dataset = self.vec_dataset[i]
+
+                curr_dataset.clean_dataset_cv(vec_models, self.vec_callbacks)
 
     # TODO: fix the print command later...
     def evaluate(self, mode='test'):
@@ -325,10 +464,21 @@ class DefaultSession:
         print("#                  Results                  #")
         print("#############################################\n")
 
-        for i in range(len(self.vec_dataset)):
-            curr_dataset = self.vec_dataset[i]
+        if not self.cv_mode:
+            for i in range(len(self.vec_dataset)):
+                curr_dataset = self.vec_dataset[i]
 
-            curr_dataset.evaluate_dataset(mode=mode)
+                curr_dataset.evaluate_dataset(mode=mode)
+
+        else:
+            for idx_fold in range(self.num_fold):
+                print("Cross Validation Fold {}/{}\n\n".format(idx_fold + 1, self.num_fold))
+                for idx_run in range(len(self.vec_dataset)):
+                    curr_dataset = self.vec_dataset[idx_run]
+
+                    curr_dataset.evaluate_dataset_cv(idx_fold, mode=mode)
+
+                print('=============================================\n')
 
     # TODO: inherit the naming pattern from cfg
     def save_model(self):
@@ -340,7 +490,12 @@ class DefaultSession:
         p_model = self.d_model / self.str_arch / self.str_sub / f_model
         p_model.mkdir(parents=True, exist_ok=True)
 
-        self.session_model.save_model_weights(p_model, f_model, overwrite=self.overwrite)
+        if not self.cv_mode:
+            self.session_model.save_model_weights(p_model, f_model, overwrite=self.overwrite)
+        else:
+            for idx_fold in range(self.num_fold):
+                f_model_fold = "{}_fold{}".format(f_model, idx_fold)
+                self.vec_session_model[idx_fold].save_model_weights(p_model, f_model_fold, overwrite=self.overwrite)
 
     # TODO: inherit the naming pattern from cfg
     def save_data(self):
@@ -349,11 +504,19 @@ class DefaultSession:
         """
 
         p_output = self.d_output / self.str_sub
-        for i in range(len(self.vec_dataset)):
-            curr_dataset = self.vec_dataset[i]
-            f_output = "{}_r0{}_bcgnet.mat".format(self.str_sub, self.vec_idx_run[i])
+        if not self.cv_mode:
+            for i in range(len(self.vec_dataset)):
+                curr_dataset = self.vec_dataset[i]
+                f_output = "{}_r0{}_bcgnet.mat".format(self.str_sub, self.vec_idx_run[i])
 
-            curr_dataset.save_data(p_output, f_output, self.overwrite)
+                curr_dataset.save_data(p_output, f_output, self.overwrite)
+        else:
+            for idx_fold in range(self.num_fold):
+                for idx_run in range(len(self.vec_dataset)):
+                    curr_dataset = self.vec_dataset[idx_run]
+                    f_output = "{}_r0{}_bcgnet_fold{}.mat".format(self.str_sub, self.vec_idx_run[idx_run], idx_fold)
+
+                    curr_dataset.save_data(p_output, f_output, self.overwrite, idx_fold=idx_fold)
 
     # TODO: think about whether this is needed at all
     def save_log(self):

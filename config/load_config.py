@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 import logging
 import pprint
@@ -7,7 +6,14 @@ import yaml
 from easydict import EasyDict as edict
 
 
-def get_default_cfg_struct():
+def _init_empty_config_struct():
+    """
+    Initializes the empty configuration structure with all fields populated with None. This structure is subsequently
+    populated with parameters read from the yaml file
+
+    :return: an empty configuration structure
+    """
+
     cfg = edict()
 
     cfg.d_root = None  # path to the root of the package
@@ -64,7 +70,7 @@ def _merge_a_into_b(a, b):
             b[k] = v
 
 
-def cfg_from_file(filename, cfg):
+def _config_from_file(filename, cfg):
     """
     Load a config from file filename and merge it into the default options.
     """
@@ -84,9 +90,16 @@ def cfg_from_file(filename, cfg):
 
 
 def get_config(filename="default_config.yaml"):
-    cfg_struct = get_default_cfg_struct()
+    """
+    Loads the configuration from the yaml file in the same directory
 
-    return cfg_from_file(filename, cfg_struct)
+    :param filename: absolute path to the yaml file
+
+    :return: fully loaded configuration file
+    """
+    cfg_struct = _init_empty_config_struct()
+
+    return _config_from_file(filename, cfg_struct)
 
 
 if __name__ == "__main__":

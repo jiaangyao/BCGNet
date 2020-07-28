@@ -143,8 +143,7 @@ def tabulate_band(vec_f_avg_set, vec_pxx_avg_set, vec_str_dataset, cutoff_low, c
         band_table.append([vec_str_dataset[i], band_dataset_i, band_ratio_dataset_i])
 
     print('Results for {} band'.format(str_band))
-    print(tabulate(band_table, headers=['Type', 'Total Power', 'Ratio to Raw']))
-    print('')
+    print(tabulate(band_table, headers=['Type', 'Total Power', 'Ratio to Raw']) + '\n')
 
 
 # TODO: check on the underscore returns later...
