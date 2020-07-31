@@ -4,15 +4,34 @@
 
 # Need to provide the absolute path to the various input dataset and
 # to desired directories for saving the output
+# these should be in absolute path to the directory
+# e.g. '/home/jsmith/project1/data/'
 
-d_data: '/home/jyao/Local/working_eegbcg/proc_full/proc_rs/'
-d_model: '/home/jyao/Downloads/'
-d_output: '/home/jyao/Downloads/'
+d_data: ''
+d_model: ''
+d_output: ''
 
 # (Optional) to be provided if want to compare against another
 # preprocessing method
-d_eval: '/home/jyao/Local/working_eegbcg/proc_full/proc_bcgobs/'
-str_eval: 'OBS'
+d_eval: ''
+str_eval: ''
+
+# Naming convention of files
+# for example if your input files is of the convention sub101_r09_raw.set
+# since the default input to our script is sub101 (name of subject) and 9
+# (index of run) you should use the format '{}_r0{}_raw'. Same idea follows
+# for the naming convention of other type of dataset listed below
+
+input_file_naming_format: '{}_r0{}_raw'
+output_file_naming_format: '{}_r0{}_bcgnet'
+
+# (Optional) naming convention of evaluation dataset, only relevant if
+# evaluation dataset is provided
+eval_file_naming_format: '{}_r0{}_eval'
+
+# (Optional) naming convention of cross validation dataset, only relevant
+# if cross validation mode of training is used
+cv_output_file_naming_format: '{}_r0{}_fold{}_bcgnet'
 
 # Hyperparameters below worked well for our tasks in
 # McIntosh et al. IEEE Trans Biomed Engi
@@ -75,3 +94,72 @@ cutoff_high_theta: 8
 
 cutoff_low_alpha: 8
 cutoff_high_alpha: 13
+
+# Define the name of the ECG channel (should be same as the name of the channel in the EEGLAB format files)
+str_ecg_channel: 'ECG'
+
+# Define the list of EEG channel names (should be same as the name of the channel in the EEGLAB format files)
+vec_str_eeg_channel:
+- 'Fp1'
+- 'Fp2'
+- 'F3'
+- 'F4'
+- 'C3'
+- 'C4'
+- 'P3'
+- 'P4'
+- 'O1'
+- 'O2'
+- 'F7'
+- 'F8'
+- 'T7'
+- 'T8'
+- 'P7'
+- 'P8'
+- 'Fz'
+- 'Cz'
+- 'Pz'
+- 'Oz'
+- 'FC1'
+- 'FC2'
+- 'CP1'
+- 'CP2'
+- 'FC5'
+- 'FC6'
+- 'CP5'
+- 'CP6'
+- 'TP9'
+- 'TP10'
+- 'POz'
+- 'F1'
+- 'F2'
+- 'C1'
+- 'C2'
+- 'P1'
+- 'P2'
+- 'AF3'
+- 'AF4'
+- 'FC3'
+- 'FC4'
+- 'CP3'
+- 'CP4'
+- 'PO3'
+- 'PO4'
+- 'F5'
+- 'F6'
+- 'C5'
+- 'C6'
+- 'P5'
+- 'P6'
+- 'AF7'
+- 'AF8'
+- 'FT7'
+- 'FT8'
+- 'TP7'
+- 'TP8'
+- 'PO7'
+- 'PO8'
+- 'FT9'
+- 'FT10'
+- 'Fpz'
+- 'CPz'

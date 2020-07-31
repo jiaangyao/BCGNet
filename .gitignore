@@ -1,2 +1,5 @@
 .idea
 __pycache__
+.ipynb_checkpoints
+cleaned_data
+trained_model

@@ -40,9 +40,9 @@ def compute_psd(dataset):
 
     :param mne.EpochsArray dataset: input objects holding the epoched data
 
-    :return: a tuple (f_avg_eeg, pxx_avg_eeg, f_avg_eeg, pxx_avg_eeg), where f_avg_eeg is a list of frequencies
-        at which the PSD was computed for all channels and pxx_avg_eeg is the power spectral of all channels,
-        both with shape (n_channel, n_data), and f_avg_eeg and pxx_avg_eeg are the channel averages
+    :return: a tuple (f_avg_eeg, pxx_avg_eeg), where f_avg_eeg is the channel average of frequencies
+        at which the PSD was computed for all channels and pxx_avg_eeg is channel average power spectral of
+        all channels
     """
 
     # obtain the data first. Note that here a transpose is needed to convert the data to the form
@@ -95,7 +95,7 @@ def compute_psd(dataset):
     f_avg_eeg = np.mean(f_eeg, axis=0)
     pxx_avg_eeg = np.mean(pxx_eeg, axis=0)
 
-    return f_eeg, pxx_eeg, f_avg_eeg, pxx_avg_eeg
+    return f_avg_eeg, pxx_avg_eeg
 
 
 def compute_band_power(f_eeg, pxx_eeg, cutoff_low, cutoff_high):
@@ -146,7 +146,6 @@ def tabulate_band(vec_f_avg_set, vec_pxx_avg_set, vec_str_dataset, cutoff_low, c
     print(tabulate(band_table, headers=['Type', 'Total Power', 'Ratio to Raw']) + '\n')
 
 
-# TODO: check on the underscore returns later...
 def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_dataset_set, epoched_eval_dataset_set=None,
                                   str_eval=None, cfg=None):
     """
@@ -173,15 +172,15 @@ def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_datas
     cutoff_high_alpha = cfg.cutoff_high_alpha
 
     # Compute the mean PSD across all channels
-    _, _, f_avg_raw_set, pxx_avg_raw_set = compute_psd(epoched_raw_dataset_set)
-    _, _, f_avg_cleaned_set, pxx_avg_cleaned_set = compute_psd(epoched_cleaned_dataset_set)
+    f_avg_raw_set, pxx_avg_raw_set = compute_psd(epoched_raw_dataset_set)
+    f_avg_cleaned_set, pxx_avg_cleaned_set = compute_psd(epoched_cleaned_dataset_set)
 
     vec_f_avg_set = [f_avg_raw_set, f_avg_cleaned_set]
     vec_pxx_avg_set = [pxx_avg_raw_set, pxx_avg_cleaned_set]
     vec_str_dataset = ['raw', 'BCGNet']
 
     if epoched_eval_dataset_set is not None:
-        _, _, f_avg_eval_set, pxx_avg_eval_set = compute_psd(epoched_eval_dataset_set)
+        f_avg_eval_set, pxx_avg_eval_set = compute_psd(epoched_eval_dataset_set)
 
         vec_f_avg_set = [f_avg_raw_set, f_avg_eval_set, f_avg_cleaned_set]
         vec_pxx_avg_set = [pxx_avg_raw_set, pxx_avg_eval_set, pxx_avg_cleaned_set]
@@ -246,7 +245,6 @@ def compute_rms_epoched_dataset(epoched_raw_dataset_set, epoched_cleaned_dataset
     return vec_rms_set
 
 
-# TODO: fix the print command here
 def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  vec_epoched_eval_dataset=None,
                 str_eval=None, mode='test', cfg=None):
     """
@@ -307,7 +305,7 @@ def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  
         # Compute the reduction in each power band
         print("\nFREQUENCY BAND POWER REDUCTION: RUN {}".format(idx_run))
         tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_dataset_set, cfg=cfg)
-    print('________________________________________\n')
+    print('\n'.rjust(41, '_'))
 
     return vec_rms_set
 

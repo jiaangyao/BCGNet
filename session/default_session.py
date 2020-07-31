@@ -2,19 +2,40 @@ import time
 import tensorflow as tf
 import numpy as np
 
-from dataset import DefaultDataset
+from dataset import Dataset
 from models import update_init
 from utils import temp_seed
 from session import DefaultGenerator
 from tensorflow.keras import callbacks
 
-# TODO: finish all documentation
 
-
-class DefaultSession:
-    # TODO: change all str_arch to str_model?
+class Session:
     def __init__(self, str_sub, vec_idx_run, str_arch, random_seed=1997, verbose=2, overwrite=False,
                  cv_mode=False, num_fold=None, cfg=None):
+        """
+        Each session consists a single block of training, where a model (in normal mode) or multiple models of the
+        same type (in cross validation mode) are trained on data generated from various runs from the same subject
+
+        :param str str_sub: name of the subject, e.g. sub11
+        :param list vec_idx_run: list containing the indices of all run on which the model is to be trained,
+            e.g. [1, 4, 5]
+        :param str str_arch: type of the model the user wishes to use. If not provided then default_rnn_model is used
+            by default. Else if user wishes to use custom model, this string should be the same as the name of
+            the corresponding .py file in 'models' directory
+        :param int random_seed: numpy random_seed used during the random splitting of entire dataset into
+            training, validation and test sets is always the same, useful for model selection and evaluation
+        :param int verbose: verbose sets the verbosity of Keras during model training,
+            0=silent, 1=progress bar, 2=one line per epoch
+        :param bool overwrite: whether or not to overwrite existing cleaned data
+        :param bool cv_mode: whether or not to use the cross validation mode. If num_fold argument is provided when
+            cv_mode is enabled, percentage of test set and validation set data will be set to 1/num_fold and
+            remaining data will be the training set. If num_fold argument is not provided
+            when cross validation mode is enabled, then the number of folds defaults to 1/per_test where
+            per_test is the percentage of test set defined in the yaml file
+        :param int num_fold: (Optional) the number of cross validation folds to be used, only relevant
+            if cross validation mode is enabled.
+        :param cfg: configuration struct that is loaded from the yaml file
+        """
 
         self.str_sub = str_sub
         self.vec_idx_run = vec_idx_run
@@ -27,21 +48,31 @@ class DefaultSession:
 
         if self.cv_mode and num_fold is None:
             self.num_fold = int(np.round(1 / cfg.per_test))
+        elif self.cv_mode and num_fold is not None:
+            self.num_fold = num_fold
+
+            self.cfg.per_test = 1 / num_fold
+            self.cfg.per_valid = 1 / num_fold
+            self.cfg.per_training = 1 - self.cfg.per_test - self.cfg.per_valid
         else:
             self.num_fold = num_fold
 
-        self.d_root = cfg.d_root
-        self.d_data = cfg.d_data
-        self.d_model = cfg.d_model
-        self.d_output = cfg.d_output
-        self.d_eval = cfg.d_eval
-        self.str_eval = cfg.str_eval
+        self.d_root = self.cfg.d_root
+        self.d_data = self.cfg.d_data
+        self.d_model = self.cfg.d_model
+        self.d_output = self.cfg.d_output
+        self.d_eval = self.cfg.d_eval
+        self.str_eval = self.cfg.str_eval
+        self.input_file_naming_format = self.cfg.input_file_naming_format
+        self.eval_file_naming_format = self.cfg.eval_file_naming_format
+        self.output_file_naming_format = self.cfg.output_file_naming_format
+        self.cv_output_file_naming_format = self.cfg.cv_output_file_naming_format
 
-        self.batch_size = cfg.batch_size
-        self.lr = cfg.lr
-        self.num_epochs = cfg.num_epochs
-        self.es_patience = cfg.es_patience
-        self.es_min_delta = cfg.es_min_delta
+        self.batch_size = self.cfg.batch_size
+        self.lr = self.cfg.lr
+        self.num_epochs = self.cfg.num_epochs
+        self.es_patience = self.cfg.es_patience
+        self.es_min_delta = self.cfg.es_min_delta
 
         self.vec_dataset = []
         if cv_mode:
@@ -71,44 +102,45 @@ class DefaultSession:
         self.vec_callbacks = None
 
     def load_all_dataset(self):
+        """
+        Load all requested runs of data from the given subject
+        """
+
         # Obtain the absolute path to all dataset for a given subject
-        vec_abs_data_path = DefaultSession._absolute_path_to_data(self.d_data, self.str_sub, self.vec_idx_run)
+        vec_abs_data_path = Session._absolute_path_to_data(self.d_data, self.str_sub, self.vec_idx_run,
+                                                           self.input_file_naming_format)
         if self.d_eval is not None:
-            vec_abs_eval_path = DefaultSession._absolute_path_to_eval(self.d_eval, self.str_sub, self.vec_idx_run)
+            vec_abs_eval_path = Session._absolute_path_to_eval(self.d_eval, self.str_sub, self.vec_idx_run,
+                                                               self.eval_file_naming_format)
 
         # initialize the dataset objects each corresponding to a single run of data
         for i in range(len(vec_abs_data_path)):
-            # TODO: check the init statement here once dataset implementation is done
             idx_run = self.vec_idx_run[i]
             abs_data_path = vec_abs_data_path[i]
             if self.d_eval is not None:
                 abs_eval_path = vec_abs_eval_path[i]
 
-                curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
-                                              d_eval=abs_eval_path, str_eval=self.str_eval,
-                                              random_seed=self.random_seed,
-                                              cv_mode=self.cv_mode, num_fold=self.num_fold,
-                                              cfg=self.cfg)
+                curr_dataset = Dataset(abs_data_path, self.str_sub, idx_run, d_eval=abs_eval_path,
+                                       str_eval=self.str_eval, random_seed=self.random_seed,
+                                       cv_mode=self.cv_mode, num_fold=self.num_fold, cfg=self.cfg)
             else:
-                curr_dataset = DefaultDataset(abs_data_path, self.str_sub, idx_run,
-                                              random_seed=self.random_seed,
-                                              cv_mode=self.cv_mode, num_fold=self.num_fold,
-                                              cfg=self.cfg)
+                curr_dataset = Dataset(abs_data_path, self.str_sub, idx_run, random_seed=self.random_seed,
+                                       cv_mode=self.cv_mode, num_fold=self.num_fold, cfg=self.cfg)
 
             curr_dataset.prepare_dataset()
             curr_dataset.split_dataset()
 
             self.vec_dataset.append(curr_dataset)
 
-    # TODO: get rid of the hardcoding of the dataset path convention
     @staticmethod
-    def _absolute_path_to_data(d_data, str_sub, vec_idx_run):
+    def _absolute_path_to_data(d_data, str_sub, vec_idx_run, input_file_naming_format):
         """
         Obtain the absolute path to the input dataset
 
         :param pathlib.Path d_data: absolute path to the dataset with filename and extension
         :param str str_sub: naming convention of the subject, e.g. 'sub11'
         :param list vec_idx_run: list containing the indices of runs to be used for training the model, e.g. [1, 2, 3]
+        :param str input_file_naming_format: naming convention of the input files defined in the config yaml files
 
         :return: a list of pathlib.Path objects holding the absolute path to all the individual runs of data
         """
@@ -116,13 +148,12 @@ class DefaultSession:
         vec_abs_path = []
 
         for idx_run in vec_idx_run:
-            vec_abs_path.append(d_data / str_sub / '{}_r0{}_rs.set'.format(str_sub, idx_run))
+            vec_abs_path.append(d_data / str_sub / (input_file_naming_format.format(str_sub, idx_run) + '.set'))
 
         return vec_abs_path
 
-    # TODO: get rid of the hardcoding of the dataset path convention
     @staticmethod
-    def _absolute_path_to_eval(d_eval, str_sub, vec_idx_run):
+    def _absolute_path_to_eval(d_eval, str_sub, vec_idx_run, eval_file_naming_format):
         """
         Obtain the absolute path to the evaluation dataset
 
@@ -130,6 +161,7 @@ class DefaultSession:
         :param pathlib.Path d_eval: absolute path to the dataset with filename and extension
         :param str str_sub: naming convention of the subject, e.g. 'sub11'
         :param list vec_idx_run: list containing the indices of runs to be used for training the model, e.g. [1, 2, 3]
+        :param str eval_file_naming_format: naming convention of the evaluation files defined in the config yaml files
 
         :return: a list of pathlib.Path objects holding the absolute path to all the individual runs of evaluation data
         :rtype: list
@@ -138,17 +170,36 @@ class DefaultSession:
         vec_abs_path = []
 
         for idx_run in vec_idx_run:
-            vec_abs_path.append(d_eval / str_sub / '{}_r0{}_rmbcg.set'.format(str_sub, idx_run))
+            vec_abs_path.append(d_eval / str_sub / (eval_file_naming_format.format(str_sub, idx_run) + '.set'))
 
         return vec_abs_path
 
-    # TODO: clean this code up a little bit...
-    # TODO: figure out the dimension of input and output more intelligently
     def prepare_training(self):
+        """
+        Initializes the tensorflow model and obtains the training, validation and test sets of data
+        """
+
+        # check if all datasets have the same number of input and EEG channels
+        vec_n_input = []
+        vec_n_output = []
+        for dataset in self.vec_dataset:
+            vec_n_input.append(dataset.n_input)
+            vec_n_output.append(dataset.n_output)
+
+        if not all(x == vec_n_input[0] for x in vec_n_input):
+            raise RuntimeError("Input datasets don't have same number of input channels")
+
+        if not all(x == vec_n_output[0] for x in vec_n_output):
+            raise RuntimeError("Input datasets don't have same number of EEG channels")
+
+        session_n_input = vec_n_input[0]
+        session_n_output = vec_n_output[0]
+
         if not self.cv_mode:
 
             # initialize the model
-            self.session_model = self._init_model(d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
+            self.session_model = self._init_model(n_input=session_n_input, n_output=session_n_output,
+                                                  d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
             self.session_model.init_model()
             self.session_model.compile_model()
 
@@ -165,13 +216,14 @@ class DefaultSession:
                                                    batch_size=1, shuffle=False)
 
             # initialize the list of callbacks during training
-            self.vec_callbacks = DefaultSession._get_callback(self.es_patience, self.es_min_delta)
+            self.vec_callbacks = Session._get_callback(self.es_patience, self.es_min_delta)
 
         else:
             # initialize the list of models
             vec_session_model = []
             for i in range(self.num_fold):
-                fold_model = self._init_model(d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
+                fold_model = self._init_model(n_input=session_n_input, n_output=session_n_output,
+                                              d_root=self.d_root, str_arch=self.str_arch, lr=self.lr)
                 fold_model.init_model()
                 fold_model.compile_model()
 
@@ -180,7 +232,7 @@ class DefaultSession:
 
             # initialize the list of training, validation and test sets and initialize the generators
             self.vec_session_xs, self.vec_session_ys, self.mat_idx_permute = \
-                DefaultSession._combine_from_runs_cv(self.vec_dataset, self.num_fold, self.random_seed)
+                Session._combine_from_runs_cv(self.vec_dataset, self.num_fold, self.random_seed)
 
             vec_training_generator = []
             vec_valid_generator = []
@@ -203,10 +255,21 @@ class DefaultSession:
             self.vec_test_generator = vec_test_generator
 
             # initialize the list of callbacks during training
-            self.vec_callbacks = DefaultSession._get_callback(self.es_patience, self.es_min_delta)
+            self.vec_callbacks = Session._get_callback(self.es_patience, self.es_min_delta)
 
     @staticmethod
-    def _init_model(d_root, str_arch=None, lr=1e-3):
+    def _init_model(n_input, n_output, d_root, str_arch=None, lr=1e-3):
+        """
+        Initializes the neural network model that will be trained
+
+        :param int n_input: input dimension to the neural network, should be 1 (number of ECG channel)
+        :param int n_output: output dimension to the neural network, should be the number (number of EEG channel)
+        :param pathlib.Path d_root: absolute path to the root directory of the package
+        :param str str_arch: the type of the model that's to be trained, if not provided then defaults to the
+            default_rnn_model, else should be a string that's of the same name as the corresponding .py file under
+            models directory
+        :param float lr: learning rate for training the model
+        """
         # update the init model in the models directory
         d_models = d_root / 'models'
         update_init(d_models)
@@ -214,7 +277,14 @@ class DefaultSession:
         if str_arch is None:
             from models import RNNModel
 
-            model = RNNModel(lr=lr)
+            model = RNNModel(n_input=n_input, n_output=n_output, lr=lr)
+
+            return model
+
+        elif str_arch == 'default_rnn_model':
+            from models import RNNModel
+
+            model = RNNModel(n_input=n_input, n_output=n_output, lr=lr)
 
             return model
 
@@ -224,7 +294,7 @@ class DefaultSession:
 
             warnings.warn("Specified model not found, initialize default model instead", RuntimeWarning)
 
-            model = RNNModel(lr=lr)
+            model = RNNModel(n_input=n_input, n_output=n_output, lr=lr)
 
             return model
 
@@ -235,7 +305,7 @@ class DefaultSession:
                 module = __import__("models")
                 class_ = getattr(module, str_arch)
 
-                model = class_(lr=lr)
+                model = class_(n_input=n_input, n_output=n_output, lr=lr)
 
                 return model
 
@@ -268,7 +338,7 @@ class DefaultSession:
             vec_xs.append(curr_dataset.xs)
             vec_ys.append(curr_dataset.ys)
 
-        session_xs, session_ys, vec_idx_permute = DefaultSession._concatenate_all_sets(vec_xs, vec_ys, random_seed)
+        session_xs, session_ys, vec_idx_permute = Session._concatenate_all_sets(vec_xs, vec_ys, random_seed)
 
         return session_xs, session_ys, vec_idx_permute
 
@@ -339,16 +409,25 @@ class DefaultSession:
 
         return session_xs, session_ys, vec_idx_permute
 
-    # TODO: finish documentation
     @staticmethod
     def _combine_from_runs_cv(vec_dataset, num_fold, random_seed):
         """
+        combine the training, validation and test sets from all dataset each holding a single run of data
+        for the cross validation mode
 
+        :param list vec_dataset: list of dataset objects where each object holds raw and precessed data from
+            a single run
+        :param int num_fold: the number of cross validation folds used
+        :param int random_seed: the random seed used in the experiment for replicable splitting of the dataset
 
-        :param vec_dataset:
-        :param num_fold
-        :param random_seed
-        :return:
+        :return: a tuple (vec_session_xs, vec_session_ys, mat_idx_permute), where vec_session_xs is a list
+            containing all the ECG data from all folds [fold0, fold1, ...], and each fold of data is in the form
+            [x_train, x_validation, x_test] and each has shape (epoch, channel, data), where vec_session_ys is a
+            list containing all the corrupted EEG data from all folds [fold0, fold1, ...] and each fold is
+            in the form of [y_train, y_validation, y_test], and each has shape (epoch, channel, data) and
+            mat_idx_permute containing the order of the random permutation in each fold in the form
+            [fold0, fold1, ...] and each fold contains the indices for the random permutation of epochs when
+            combining the epochs from each individual dataset
         """
 
         vec_session_xs = []
@@ -365,7 +444,7 @@ class DefaultSession:
                 vec_xs.append(curr_dataset.vec_xs[i])
                 vec_ys.append(curr_dataset.vec_ys[i])
 
-            session_xs, session_ys, vec_idx_permute = DefaultSession._concatenate_all_sets(vec_xs, vec_ys, random_seed)
+            session_xs, session_ys, vec_idx_permute = Session._concatenate_all_sets(vec_xs, vec_ys, random_seed)
 
             vec_session_xs.append(session_xs)
             vec_session_ys.append(session_ys)
@@ -451,7 +530,6 @@ class DefaultSession:
 
                 curr_dataset.clean_dataset_cv(vec_models, self.vec_callbacks)
 
-    # TODO: fix the print command later...
     def evaluate(self, mode='test'):
         """
         Evaluate the performance of the model on all dataset
@@ -460,9 +538,9 @@ class DefaultSession:
         power ratio from
         """
 
-        print("\n#############################################")
-        print("#                  Results                  #")
-        print("#############################################\n")
+        print('\n'.ljust(51, '#'))
+        print("#" + 'RESULT'.center(48) + "#")
+        print('\n'.rjust(51, '#'))
 
         if not self.cv_mode:
             for i in range(len(self.vec_dataset)):
@@ -478,9 +556,8 @@ class DefaultSession:
 
                     curr_dataset.evaluate_dataset_cv(idx_fold, mode=mode)
 
-                print('=============================================\n')
+                print('\n'.rjust(51, '='))
 
-    # TODO: inherit the naming pattern from cfg
     def save_model(self):
         """
         Save the trained model
@@ -497,34 +574,47 @@ class DefaultSession:
                 f_model_fold = "{}_fold{}".format(f_model, idx_fold)
                 self.vec_session_model[idx_fold].save_model_weights(p_model, f_model_fold, overwrite=self.overwrite)
 
-    # TODO: inherit the naming pattern from cfg
     def save_data(self):
         """
-        Save the cleaned time series
+        Save the cleaned time series in MATLAB .mat files
         """
 
         p_output = self.d_output / self.str_sub
         if not self.cv_mode:
             for i in range(len(self.vec_dataset)):
                 curr_dataset = self.vec_dataset[i]
-                f_output = "{}_r0{}_bcgnet.mat".format(self.str_sub, self.vec_idx_run[i])
+                f_output = self.output_file_naming_format.format(self.str_sub, self.vec_idx_run[i]) + '.mat'
 
                 curr_dataset.save_data(p_output, f_output, self.overwrite)
         else:
             for idx_fold in range(self.num_fold):
                 for idx_run in range(len(self.vec_dataset)):
                     curr_dataset = self.vec_dataset[idx_run]
-                    f_output = "{}_r0{}_bcgnet_fold{}.mat".format(self.str_sub, self.vec_idx_run[idx_run], idx_fold)
+                    f_output = self.cv_output_file_naming_format.format(self.str_sub,
+                                                                        self.vec_idx_run[idx_run], idx_fold) + ".mat"
 
                     curr_dataset.save_data(p_output, f_output, self.overwrite, idx_fold=idx_fold)
 
-    # TODO: think about whether this is needed at all
-    def save_log(self):
+    def save_dataset(self):
         """
-        Save the output
+        Save the cleaned dataset in Neuromag .fif files
+        """
 
-        :return:
-        """
+        p_output = self.d_output / self.str_sub
+        if not self.cv_mode:
+            for i in range(len(self.vec_dataset)):
+                curr_dataset = self.vec_dataset[i]
+                f_output = self.output_file_naming_format.format(self.str_sub, self.vec_idx_run[i]) + '.mat'
+
+                curr_dataset.save_dataset(p_output, f_output, self.overwrite)
+        else:
+            for idx_fold in range(self.num_fold):
+                for idx_run in range(len(self.vec_dataset)):
+                    curr_dataset = self.vec_dataset[idx_run]
+                    f_output = self.cv_output_file_naming_format.format(self.str_sub,
+                                                                        self.vec_idx_run[idx_run], idx_fold) + ".mat"
+
+                    curr_dataset.save_dataset(p_output, f_output, self.overwrite, idx_fold=idx_fold)
 
 
 if __name__ == '__main__':
