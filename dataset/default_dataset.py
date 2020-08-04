@@ -946,7 +946,7 @@ class Dataset:
 
     def save_data(self, p_output, f_output, overwrite=False, idx_fold=None, **kwargs):
         """
-        Save the processed data in MATLAB .mat format
+        Save the processed data in MATLAB .mat format. Note that the unit of the data is in Volts
 
         :param pathlib.Path p_output: directory to save the dataset into
         :param str f_output: filename of the saved dataset
