@@ -16,8 +16,7 @@ version of TensorFlow. Please note GPU version of TensorFlow is only for compati
 For the Tensorflow version 2.3.0 we used for testing the package, NVIDIA driver version has to be at least 418.39 and 
 CUDA version has to be 10.1. Our build was tested using NVIDIA driver version 435.21 and CUDA 10.1.
 
-To install NVIDIA driver, download the desired version for the particular OS and GPU on your local unit under the 'Advanced Driver Search'.
-[here.](https://www.nvidia.com/Download/index.aspx)<br> 
+To install NVIDIA driver, download the desired version for the particular OS and GPU on your local unit under the 'Advanced Driver Search' [here.](https://www.nvidia.com/Download/index.aspx)<br> 
 
 To install CUDA, detailed instructions can be found [here.](https://developer.nvidia.com/cuda-toolkit)<br>
 
@@ -58,8 +57,7 @@ cd PATH_TO_OUR_PACKAGE
 pip install requirement.txt
 ```
 
-The user then needs to install `jupyterlab` and the detailed instructions can be found [here]
-(https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html)<br>. 
+The user then needs to install `jupyterlab` and the detailed instructions can be found [here](https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html)<br>. 
 
 Note: to check the TensorFlow version, execute
 ```
