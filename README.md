@@ -4,7 +4,7 @@ Authors: Yida Lin, Jiaang Yao, James McIntosh
 BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction. 
 The detail about our model and methodology in general can be found in J. R. McIntosh, J. Yao, L. Hong, J. Faller 
 and P. Sajda, "Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning," 
-IEEE Trans Biomed Eng. found [here](https://ieeexplore.ieee.org/document/9124646)<br>
+IEEE Trans Biomed Eng. found [here.](https://ieeexplore.ieee.org/document/9124646)<br>
 
 # Installation Guides
 ## Additional Dependencies (Optional)
@@ -19,21 +19,20 @@ CUDA version has to be 10.1. Our build was tested using NVIDIA driver version 43
 To install NVIDIA driver, download the desired version for the particular OS and GPU on your local unit from 
 [here](https://www.nvidia.com/Download/index.aspx)<br> under the 'Advanced Driver Search'.
 
-To install CUDA, detailed instructions can be found [here](https://developer.nvidia.com/cuda-toolkit)<br>.
+To install CUDA, detailed instructions can be found [here.](https://developer.nvidia.com/cuda-toolkit)<br>
 
 Note: after installing, NVIDIA driver and CUDA version can be checked by typing in `nvidia-smi` in your terminal.
 
 ### 2. CuDNN
 Once CUDA is successfully installed, the user can proceed to install CuDNN. Detailed instructions for installing CuDNN
-can be found [here](https://docs.nvidia.com/deeplearning/sdk/pdf/cuDNN-Installation-Guide.pdf)<br>
+can be found [here.](https://docs.nvidia.com/deeplearning/sdk/pdf/cuDNN-Installation-Guide.pdf)<br>
 
 Note: For Linux users, note that it's critical that `LD_LIBRARY_PATH`, which maps the CuDNN path, is added to 
 `.bashrc` and sourced.
 
 ### 3. miniconda/anaconda
 It's recommended to install either anaconda or the lightweight miniconda on your machine for managing the Python 
-environment. To install anaconda/miniconda, detailed instructions can be found [here]
-(https://docs.anaconda.com/anaconda/install/)<br>. 
+environment. To install anaconda/miniconda, detailed instructions can be found [here.](https://docs.anaconda.com/anaconda/install/)<br>
 
 ## Setting up Python Dependencies 
 
