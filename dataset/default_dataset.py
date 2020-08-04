@@ -1204,7 +1204,7 @@ class Dataset:
 
             # Plotting the power spectral density
             plt.figure(figsize=(6, 6))
-            plt.title('PSD for Channel {}'.format(str_ch_eeg))
+            plt.title('PSD from RUN {} for Channel {}'.format(idx_run, str_ch_eeg))
             plt.semilogy(f_raw_set[ch_eeg, :], pxx_raw_set[ch_eeg, :], 'C1-', label='Raw')
             if epoched_eval_dataset_set is not None:
                 _, _, f_eval_set, pxx_eval_set = compute_psd(epoched_eval_dataset_set)
