@@ -46,6 +46,19 @@ def _init_empty_config_struct():
     return cfg
 
 
+def get_config(filename="default_config.yaml"):
+    """
+    Loads the configuration from the yaml file in the same directory
+
+    :param filename: absolute path to the yaml file
+
+    :return: fully loaded configuration file
+    """
+    cfg_struct = _init_empty_config_struct()
+
+    return _config_from_file(filename, cfg_struct)
+
+
 def _merge_a_into_b(a, b):
     """
     Merge config dictionary a into config dictionary b, clobbering the
@@ -87,19 +100,6 @@ def _config_from_file(filename, cfg):
 
     logging.info("Config:\n" + pprint.pformat(cfg))
     return cfg
-
-
-def get_config(filename="default_config.yaml"):
-    """
-    Loads the configuration from the yaml file in the same directory
-
-    :param filename: absolute path to the yaml file
-
-    :return: fully loaded configuration file
-    """
-    cfg_struct = _init_empty_config_struct()
-
-    return _config_from_file(filename, cfg_struct)
 
 
 if __name__ == "__main__":

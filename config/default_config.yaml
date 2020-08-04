@@ -163,3 +163,16 @@ vec_str_eeg_channel:
 - 'FT10'
 - 'Fpz'
 - 'CPz'
+
+
+##############################################################################
+#### Plotting hyperparamters
+##############################################################################
+
+# Define the frequency range for plotting the power spectral density plots
+low_frequency_cutoff_psd: 0
+high_frequency_cutoff_psd: 30
+
+# Define the y range for plotting the power spectral density plots
+low_y_cutoff_psd: 0.001
+high_y_cutoff_psd: 1000

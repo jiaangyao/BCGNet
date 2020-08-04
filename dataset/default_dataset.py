@@ -1,11 +1,12 @@
 import mne
 import numpy as np
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 import scipy.io as sio
 from scipy.stats import median_absolute_deviation
 from utils import temp_seed
-from dataset import interpolate_raw_dataset, compute_rms
+from dataset import interpolate_raw_dataset, compute_rms, compute_psd
 
 
 class Dataset:
@@ -91,6 +92,9 @@ class Dataset:
 
         self.epoched_cleaned_dataset = None
         self.cleaned_dataset = None
+        self.vec_epoched_raw_dataset = None
+        self.vec_epoched_eval_dataset = None
+        self.vec_epoched_cleaned_dataset = None
         self.rms_results = {}
 
         if self.resampled:
@@ -106,6 +110,10 @@ class Dataset:
             self.vec_orig_cleaned_dataset = None
             self.vec_epoched_cleaned_dataset = None
             self.vec_cleaned_dataset = None
+
+            self.mat_epoched_raw_dataset = {}
+            self.mat_epoched_eval_dataset = {}
+            self.mat_epoched_cleaned_dataset = {}
 
             if num_fold is not None:
                 self.num_fold = num_fold
@@ -848,10 +856,14 @@ class Dataset:
             vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,
                                       vec_epoched_eval_dataset=vec_epoched_eval_dataset,
                                       str_eval=self.str_eval, mode=mode, cfg=self.cfg)
+
+            self.vec_epoched_eval_dataset = vec_epoched_eval_dataset
         else:
             vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,
                                       mode=mode, cfg=self.cfg)
 
+        self.vec_epoched_raw_dataset = vec_epoched_raw_dataset
+        self.vec_epoched_cleaned_dataset = vec_epoched_cleaned_dataset
         self.rms_results[mode] = vec_rms_set
 
     def evaluate_dataset_cv(self, idx_fold, mode='test'):
@@ -886,9 +898,14 @@ class Dataset:
             vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset_tvt, vec_epoched_cleaned_dataset_tvt,
                                       vec_epoched_eval_dataset=vec_epoched_eval_dataset_tvt,
                                       str_eval=self.str_eval, mode=mode, cfg=self.cfg)
+
+            self.mat_epoched_eval_dataset[idx_fold] = vec_epoched_eval_dataset_tvt
         else:
             vec_rms_set = compute_rms(self.idx_run, vec_epoched_raw_dataset_tvt, vec_epoched_cleaned_dataset_tvt,
                                       mode=mode, cfg=self.cfg)
+
+        self.mat_epoched_raw_dataset[idx_fold] = vec_epoched_raw_dataset_tvt
+        self.mat_epoched_cleaned_dataset[idx_fold] = vec_epoched_cleaned_dataset_tvt
 
         if idx_fold not in self.rms_results:
             fold_rms_results = {mode: vec_rms_set}
@@ -961,6 +978,252 @@ class Dataset:
         # Save the dataset
         if overwrite or (p_output_curr / f_output).exists() is False:
             sio.savemat(str(p_output_curr / f_output), {'data': cleaned_data}, **kwargs)
+
+    def _get_set_data(self, mode, idx_fold=None):
+        """
+        Obtain the data from a given set
+
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract
+        :param int idx_fold: (Optional) which fold to extract from, only relevant if cv_mode=True
+        """
+        if mode == 'test':
+            idx_set = 2
+        elif mode == 'valid':
+            idx_set = 1
+        elif mode == 'train':
+            idx_set = 0
+        else:
+            raise NotImplementedError
+
+        if not self.cv_mode:
+            epoched_raw_dataset_set = self.vec_epoched_raw_dataset[idx_set]
+            epoched_cleaned_dataset_set = self.vec_epoched_cleaned_dataset[idx_set]
+            vec_idx_slice_set = self.vec_idx_slice[idx_set]
+
+            if self.eval_dataset is not None:
+                epoched_eval_dataset_set = self.vec_epoched_eval_dataset[idx_set]
+            else:
+                epoched_eval_dataset_set = None
+        else:
+            epoched_raw_dataset_set = self.mat_epoched_raw_dataset[idx_fold][idx_set]
+            epoched_cleaned_dataset_set = self.mat_epoched_cleaned_dataset[idx_fold][idx_set]
+            vec_idx_slice_set = self.mat_idx_slice[idx_fold][idx_set]
+
+            if self.eval_dataset is not None:
+                epoched_eval_dataset_set = self.mat_epoched_eval_dataset[idx_fold][idx_set]
+            else:
+                epoched_eval_dataset_set = None
+
+        return epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set, vec_idx_slice_set
+
+    def plot_random_epoch(self, str_ch_eeg='Pz', mode='test', idx_fold=None, p_figure=None):
+        """
+        Plotting the prediction of an architecture on a random epoch.
+
+        :param str str_ch_eeg: Name of the EEG channel to plot
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
+            power ratio from
+        :param int idx_fold: index of the fold to plot from
+        :param pathlib.Path p_figure: (Optional) object that holds the path to save the figures to
+
+        """
+        epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set, vec_idx_slice_set = \
+            self._get_set_data(mode=mode, idx_fold=idx_fold)
+
+        Dataset._plot_random_epoch(epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set,
+                                   vec_idx_slice_set, self.idx_run, str_eval=self.str_eval, str_ch_eeg=str_ch_eeg,
+                                   p_figure=p_figure)
+
+    @staticmethod
+    def _plot_random_epoch(epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set,
+                           vec_idx_slice_set, idx_run, str_eval=None, str_ch_eeg='Pz',
+                           p_figure=None):
+        """
+        Private function for plotting the prediction of an architecture on a random epoch.
+
+        :param mne.EpochsArray epoched_raw_dataset_set: object holding the epoched data from the raw dataset,
+            note that the data is in the form of (epoch, channel, data)
+        :param mne.EpochsArray epoched_eval_dataset_set: (Optional) object holding the epoched data from the
+            evaluation dataset, note that the data is in the form of (epoch, channel, data)
+        :param mne.EpochsArray epoched_cleaned_dataset_set: object holding the epoched data from the
+            BCGNet-cleaned dataset, note that the data is in the form of (epoch, channel, data)
+        :param list vec_idx_slice_set: indices of the epochs in the original dataset
+        :param int idx_run: index of the current run
+        :param str str_eval: (Optional) name of the evaluation method used, only relevant if epoched_eval_dataset_set
+            is provided
+        :param str str_ch_eeg: Name of the EEG channel to plot
+        :param pathlib.Path p_figure: object that holds the path to save the figures to
+        """
+
+        # Obtain the info and the indices for ECG and all EEG channels
+        info = epoched_raw_dataset_set.info
+        ch_ecg = info['ch_names'].index('ECG')
+        ch_eeg = info['ch_names'].index(str_ch_eeg)
+
+        # in the EEG data, numbering needs to be adjusted
+        if ch_eeg > ch_ecg:
+            ch_eeg -= 1
+
+        # Obtain the ECG data from all the epochs, note that the data is the form of (epoch, data)
+        ecg_data_set = epoched_raw_dataset_set.get_data()[:, ch_ecg, :] * 1e6
+
+        # Obtain the time corresponding to each sample
+        t = np.arange(0, ecg_data_set.shape[1], 1) / info['sfreq']
+        epoch_length = len(t) / info['sfreq']
+
+        # Similarly, obtain the EEG data from all three datasets, note that these data are in the form of
+        # (epoch, data)
+        raw_eeg_data_set = epoched_raw_dataset_set.get_data()[:, ch_eeg, :] * 1e6
+        cleaned_eeg_data_set = epoched_cleaned_dataset_set.get_data()[:, ch_eeg, :] * 1e6
+
+        # select a random epoch
+        idx_epoch = np.random.randint(0, raw_eeg_data_set.shape[0])
+        num_epoch = vec_idx_slice_set[idx_epoch] + 1
+
+        plt.figure(figsize=(8, 10))
+        plt.suptitle('Prediction from RUN {}, in Channel {}, Epoch{}'.format(idx_run, str_ch_eeg, num_epoch),
+                     fontweight='bold')
+        plt.subplot(311)
+        plt.title('Original ECG')
+        plt.plot(t, ecg_data_set[idx_epoch, :], 'C0')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Amplitude ($\mu$V)')
+        plt.xlim([0, epoch_length * 1.05])
+
+        plt.subplot(312)
+        plt.title('BCGNet-predicted BCG')
+        plt.plot(t, raw_eeg_data_set[idx_epoch, :] - cleaned_eeg_data_set[idx_epoch, :], 'C4')
+        plt.xlabel('Time (s)')
+        plt.ylabel('Amplitude ($\mu$V)')
+        plt.xlim([0, epoch_length * 1.05])
+
+        plt.subplot(313)
+        plt.title('Raw and Cleaned Data')
+        plt.plot(t, raw_eeg_data_set[idx_epoch, :], 'C1', label='Raw')
+        if epoched_eval_dataset_set is not None:
+            eval_eeg_data_set = epoched_eval_dataset_set.get_data()[:, ch_eeg, :] * 1e6
+            plt.plot(t, eval_eeg_data_set[idx_epoch, :], 'C2', label=str_eval)
+        plt.plot(t, cleaned_eeg_data_set[idx_epoch, :], 'C3', label='BCGNet')
+
+        plt.xlabel('Time (s)')
+        plt.ylabel('Amplitude ($\mu$V)')
+        plt.xlim([0, epoch_length * 1.05])
+
+        plt.legend(loc='upper right', frameon=False)
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.90)
+
+        fig = plt.gcf()
+        if p_figure is not None:
+            fig.savefig(p_figure / 'test_set_epoch_ch{}_ep{}.png'.format(ch_eeg, num_epoch), format='png')
+        else:
+            plt.show()
+        plt.close(fig)
+
+    def plot_psd(self, str_ch_eeg='avg', mode='test', idx_fold=None, p_figure=None):
+        """
+        Plotting the power spectral density from the raw and cleaned data
+
+        :param str str_ch_eeg: 'avg' or name of the EEG channel to plot, if 'avg' then plot the mean PSD
+            across all channels
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
+            power ratio from
+        :param int idx_fold: index of the fold to plot from
+        :param pathlib.Path p_figure: (Optional) object that holds the path to save the figures to
+        """
+
+        epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set, vec_idx_slice_set = \
+            self._get_set_data(mode=mode, idx_fold=idx_fold)
+
+        frequency_cutoff = [self.cfg.low_frequency_cutoff_psd, self.cfg.high_frequency_cutoff_psd]
+        y_cutoff = [self.cfg.low_y_cutoff_psd, self.cfg.high_y_cutoff_psd]
+
+        Dataset._plot_psd(epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set,
+                          frequency_cutoff, y_cutoff, self.idx_run, str_ch_eeg, self.str_eval, p_figure)
+
+    @staticmethod
+    def _plot_psd(epoched_raw_dataset_set, epoched_eval_dataset_set, epoched_cleaned_dataset_set,
+                  frequency_cutoff, y_cutoff, idx_run, str_ch_eeg='avg', str_eval=None, p_figure=None):
+        """
+        Plot the PSD for chosen number of channels and the summary PSD by default
+
+        :param mne.EpochsArray epoched_raw_dataset_set: object holding the epoched data from the raw dataset,
+            note that the data is in the form of (epoch, channel, data)
+        :param mne.EpochsArray epoched_eval_dataset_set: object holding the epoched data from the dataset cleaned
+            by the evaluation method
+        :param mne.EpochsArray epoched_cleaned_dataset_set: object holding the epoched data from the
+            BCGNet-cleaned dataset
+        :param list frequency_cutoff: frequency range to plot the figure in, defined in the config yaml file
+        :param list y_cutoff: plotting range of the PSD, defined in the config yaml file
+        :param int idx_run: index of the run to plot the figure from
+        :param str str_ch_eeg: 'avg' or name of the EEG channel to plot from, 'avg' will plot the mean PSD
+            across al channels
+        :param str str_eval: name of the evaluation method
+        :param pathlib.Path p_figure: pathlib.Path object holding the path to the directory for saving the figures
+        """
+
+        # obtain the info object and indices for the ECG and all EEG channels
+        info = epoched_raw_dataset_set.info
+        ch_ecg = info['ch_names'].index('ECG')
+
+        # Compute the mean PSD across all channels and all PSD
+        f_avg_raw_set, pxx_avg_raw_set, f_raw_set, pxx_raw_set = compute_psd(epoched_raw_dataset_set)
+        f_avg_cleaned_set, pxx_avg_cleaned_set, f_cleaned_set, pxx_cleaned_set = \
+            compute_psd(epoched_cleaned_dataset_set)
+
+        if str_ch_eeg == 'avg':
+            # Plotting the average power spectral density across all channels
+            plt.figure(figsize=(6, 6))
+            plt.title('Average PSD from RUN {} across all Channels'.format(idx_run))
+            plt.semilogy(f_avg_raw_set, pxx_avg_raw_set, 'C1-', label='Raw')
+            if epoched_eval_dataset_set is not None:
+                f_avg_eval_set, pxx_avg_eval_set, _, _ = compute_psd(epoched_eval_dataset_set)
+                plt.semilogy(f_avg_eval_set, pxx_avg_eval_set, 'C2--', label='OBS')
+            plt.semilogy(f_avg_cleaned_set, pxx_avg_cleaned_set, 'C3--', label='BCGNet')
+
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel(r'PSD ($\mu V^2/Hz)$')
+
+            plt.xlim(frequency_cutoff)
+            plt.ylim(y_cutoff)
+            plt.legend(loc='upper right')
+
+            fig = plt.gcf()
+            if p_figure is not None:
+                fig.savefig(p_figure / 'psd_run{}_avg.png'.format(idx_run), format='png')
+            else:
+                plt.show()
+            plt.close(fig)
+
+        else:
+            ch_eeg = info['ch_names'].index(str_ch_eeg)
+
+            # in the EEG data, numbering needs to be adjusted
+            if ch_eeg > ch_ecg:
+                ch_eeg -= 1
+
+            # Plotting the power spectral density
+            plt.figure(figsize=(6, 6))
+            plt.title('PSD for Channel {}'.format(str_ch_eeg))
+            plt.semilogy(f_raw_set[ch_eeg, :], pxx_raw_set[ch_eeg, :], 'C1-', label='Raw')
+            if epoched_eval_dataset_set is not None:
+                _, _, f_eval_set, pxx_eval_set = compute_psd(epoched_eval_dataset_set)
+                plt.semilogy(f_eval_set[ch_eeg, :], pxx_eval_set[ch_eeg, :], 'C2--', label=str_eval)
+            plt.semilogy(f_cleaned_set[ch_eeg, :], pxx_cleaned_set[ch_eeg, :], 'C3--', label='BCGNet')
+
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel(r'PSD ($\mu V^2/Hz)$')
+
+            plt.xlim(frequency_cutoff)
+            plt.ylim(y_cutoff)
+            plt.legend(loc='upper right')
+
+            fig = plt.gcf()
+            if p_figure is not None:
+                fig.savefig(p_figure / 'psd_run{}_ch{}.png'.format(idx_run, str_ch_eeg), format='png')
+            else:
+                plt.show()
+            plt.close(fig)
 
 
 if __name__ == '__main__':

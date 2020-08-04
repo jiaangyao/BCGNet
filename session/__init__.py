@@ -1,2 +1,2 @@
-from session.data_generator import *
-from session.default_session import *
+from session.data_generator import DefaultGenerator
+from session.default_session import Session

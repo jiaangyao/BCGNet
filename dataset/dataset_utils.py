@@ -40,9 +40,10 @@ def compute_psd(dataset):
 
     :param mne.EpochsArray dataset: input objects holding the epoched data
 
-    :return: a tuple (f_avg_eeg, pxx_avg_eeg), where f_avg_eeg is the channel average of frequencies
+    :return: a tuple (f_avg_eeg, pxx_avg_eeg, f_eeg, pxx_eeg), where f_avg_eeg is the channel average of frequencies
         at which the PSD was computed for all channels and pxx_avg_eeg is channel average power spectral of
-        all channels
+        all channels, f_eeg is the matrix of all frequencies from all channels and pxx_eeg is the matrix of all
+        PSD from all channels, both of shape (n_channel, n_frequency)
     """
 
     # obtain the data first. Note that here a transpose is needed to convert the data to the form
@@ -95,7 +96,7 @@ def compute_psd(dataset):
     f_avg_eeg = np.mean(f_eeg, axis=0)
     pxx_avg_eeg = np.mean(pxx_eeg, axis=0)
 
-    return f_avg_eeg, pxx_avg_eeg
+    return f_avg_eeg, pxx_avg_eeg, f_eeg, pxx_eeg
 
 
 def compute_band_power(f_eeg, pxx_eeg, cutoff_low, cutoff_high):
@@ -172,15 +173,15 @@ def tabulate_band_power_reduction(epoched_raw_dataset_set, epoched_cleaned_datas
     cutoff_high_alpha = cfg.cutoff_high_alpha
 
     # Compute the mean PSD across all channels
-    f_avg_raw_set, pxx_avg_raw_set = compute_psd(epoched_raw_dataset_set)
-    f_avg_cleaned_set, pxx_avg_cleaned_set = compute_psd(epoched_cleaned_dataset_set)
+    f_avg_raw_set, pxx_avg_raw_set, _, _ = compute_psd(epoched_raw_dataset_set)
+    f_avg_cleaned_set, pxx_avg_cleaned_set, _, _ = compute_psd(epoched_cleaned_dataset_set)
 
     vec_f_avg_set = [f_avg_raw_set, f_avg_cleaned_set]
     vec_pxx_avg_set = [pxx_avg_raw_set, pxx_avg_cleaned_set]
     vec_str_dataset = ['raw', 'BCGNet']
 
     if epoched_eval_dataset_set is not None:
-        f_avg_eval_set, pxx_avg_eval_set = compute_psd(epoched_eval_dataset_set)
+        f_avg_eval_set, pxx_avg_eval_set, _, _ = compute_psd(epoched_eval_dataset_set)
 
         vec_f_avg_set = [f_avg_raw_set, f_avg_eval_set, f_avg_cleaned_set]
         vec_pxx_avg_set = [pxx_avg_raw_set, pxx_avg_eval_set, pxx_avg_cleaned_set]

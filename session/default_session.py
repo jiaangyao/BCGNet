@@ -1,6 +1,7 @@
 import time
 import tensorflow as tf
 import numpy as np
+import matplotlib.pyplot as plt
 
 from dataset import Dataset
 from models import update_init
@@ -615,6 +616,84 @@ class Session:
                                                                         self.vec_idx_run[idx_run], idx_fold) + ".mat"
 
                     curr_dataset.save_dataset(p_output, f_output, self.overwrite, idx_fold=idx_fold)
+
+    def plot_training_history(self, p_figure=None):
+        """
+        Plotting the training loss and validation loss for RNN training
+
+        :param pathlib.path p_figure: (Optional) pathlib.Path object holding the root directory to save the figure to
+        """
+
+        if not self.cv_mode:
+            Session._plot_hist(self.m, p_figure)
+
+        else:
+            vec_m = self.vec_m
+            for idx_m in range(len(vec_m)):
+                m = vec_m[idx_m]
+                Session._plot_hist(m, p_figure, idx_m)
+
+    @staticmethod
+    def _plot_hist(m, p_figure, idx_m=None):
+        plt.figure(figsize=(6, 5), num=11)
+        epochs = len(m.epoch)
+        n_epoch = np.arange(1, epochs + 1)
+        plt.plot(n_epoch, m.history['loss'], label='loss')
+        plt.plot(n_epoch, m.history['val_loss'], label='val loss')
+        plt.legend()
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        if idx_m is None:
+            plt.title('Training History')
+        else:
+            plt.title('Training History: model {}'.format(idx_m))
+
+        fig = plt.gcf()
+        if p_figure is not None:
+            if idx_m is None:
+                f_figure = 'training_history.png'
+            else:
+                f_figure = 'training_history_{}.png'.format(idx_m)
+            fig.savefig(p_figure / f_figure, format='png')
+        else:
+            plt.show()
+        plt.close(fig)
+
+    def plot_random_epoch(self, str_ch_eeg='Pz', mode='test', p_figure=None, idx_fold=None):
+        """
+        Plotting the prediction of an architecture on a random epoch.
+
+        :param str str_ch_eeg: Name of the EEG channel to plot
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to plot the epoch from
+        :param pathlib.Path p_figure: (Optional) object that holds the path to save the figures to
+        :param int idx_fold: (Optional) which fold of training to plot the results from, only relevant if cv_mode=True
+        """
+
+        if self.cv_mode:
+            if idx_fold is None:
+                raise RuntimeError('Must provide idx_fold if cv_mode is True')
+
+        for dataset in self.vec_dataset:
+            dataset.plot_random_epoch(str_ch_eeg=str_ch_eeg, mode=mode, p_figure=p_figure, idx_fold=idx_fold)
+
+    def plot_psd(self, str_ch_eeg='avg', mode='test', idx_fold=None, p_figure=None):
+        """
+        Plotting the power spectral density from the raw and cleaned data
+
+        :param str str_ch_eeg: 'avg' or name of the EEG channel to plot, if 'avg' then plot the mean PSD
+            across all channels
+        :param str mode: either 'train', 'valid' or 'test', indicating which set to extract RMS value and
+            power ratio from
+        :param int idx_fold: index of the fold to plot from
+        :param pathlib.Path p_figure: (Optional) object that holds the path to save the figures to
+        """
+
+        if self.cv_mode:
+            if idx_fold is None:
+                raise RuntimeError('Must provide idx_fold if cv_mode is True')
+
+        for dataset in self.vec_dataset:
+            dataset.plot_psd(str_ch_eeg=str_ch_eeg, mode=mode, p_figure=p_figure, idx_fold=idx_fold)
 
 
 if __name__ == '__main__':
