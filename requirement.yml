@@ -1,0 +1,17 @@
+name: bcgnet_TF230
+channels:
+- defaults
+- conda-forge
+dependencies:
+- python==3.8.1
+- jupyterlab
+- pip
+- pip:
+  - tensorflow==2.3.0
+  - tensorflow-gpu==2.3.0
+  - scipy==1.4.1
+  - mne==0.20.7
+  - matplotlib
+  - tabulate
+  - pyyaml
+  - easydict
