@@ -1,3 +1,4 @@
+import abc
 import tensorflow as tf
 
 if int(tf.__version__[0]) > 1:
@@ -13,14 +14,15 @@ else:
     from tensorflow.python.keras import backend as K
 
 
-class NNModel:
+class NNModel(metaclass=abc.ABCMeta):
     def __init__(self):
         self.name = None
         self.model = None
         self.optimizer = None
 
+    @abc.abstractmethod
     def init_model(self):
-        raise NotImplementedError
+        pass
 
     def disable(self):
         for layer in self.model.layers:

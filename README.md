@@ -1,10 +1,10 @@
 # BCGNet: Deep Learning Toolbox for BCG Artifact Reduction
-Authors: Yida Lin, Jiaang Yao, James McIntosh
+Authors: Jiaang Yao, Yida Lin, James McIntosh
 
 BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction. 
 The detail about our model and methodology in general can be found in J. R. McIntosh, J. Yao, L. Hong, J. Faller 
 and P. Sajda, "Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning," 
-IEEE Trans Biomed Eng. found [here.](https://ieeexplore.ieee.org/document/9124646)<br>
+IEEE Trans Biomed Eng. found [here](https://ieeexplore.ieee.org/document/9124646)<br>
 
 # Installation Guides
 ## Additional Dependencies (Optional)
@@ -18,7 +18,7 @@ CUDA version has to be 10.1. Our build was tested using NVIDIA driver version 43
 
 To install NVIDIA driver, download the desired version for the particular OS and GPU on your local unit under the 'Advanced Driver Search' [here.](https://www.nvidia.com/Download/index.aspx)<br> 
 
-To install CUDA, detailed instructions can be found [here.](https://developer.nvidia.com/cuda-toolkit)<br>
+To install CUDA, detailed instructions can be found [here](https://developer.nvidia.com/cuda-toolkit)<br>
 
 Note: after installing, NVIDIA driver and CUDA version can be checked by typing in `nvidia-smi` in your terminal.
 
@@ -31,9 +31,9 @@ Note: For Linux users, note that it's critical that `LD_LIBRARY_PATH`, which map
 
 ### 3. miniconda/anaconda
 It's recommended to install either anaconda or the lightweight miniconda on your machine for managing the Python 
-environment. To install anaconda/miniconda, detailed instructions can be found [here.](https://docs.anaconda.com/anaconda/install/)<br>
+environment. To install anaconda/miniconda, detailed instructions can be found [here](https://docs.anaconda.com/anaconda/install/)<br>
 
-## Setting up Python Dependencies 
+## Setting up Python Dependencies
 
 The recommended way is to set up a new conda environment using the `requirement.yml` file we provide. Alternatively,
 the user can choose to install all the packages using `pip`.
@@ -57,7 +57,7 @@ cd PATH_TO_OUR_PACKAGE
 pip install requirement.txt
 ```
 
-The user then needs to install `jupyterlab` and the detailed instructions can be found [here](https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html)<br>. 
+The user then needs to install `jupyterlab` and the detailed instructions can be found [here](https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html)<br>
 
 Note: to check the TensorFlow version, execute
 ```

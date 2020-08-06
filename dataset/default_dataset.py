@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import scipy.io as sio
 from scipy.stats import median_absolute_deviation
 from utils import temp_seed
-from dataset import interpolate_raw_dataset, compute_rms, compute_psd
+from dataset import interpolate_raw_dataset, compute_rms, compute_psd, examine_mode
 
 
 class Dataset:
@@ -986,31 +986,24 @@ class Dataset:
         :param str mode: either 'train', 'valid' or 'test', indicating which set to extract
         :param int idx_fold: (Optional) which fold to extract from, only relevant if cv_mode=True
         """
-        if mode == 'test':
-            idx_set = 2
-        elif mode == 'valid':
-            idx_set = 1
-        elif mode == 'train':
-            idx_set = 0
-        else:
-            raise NotImplementedError
+        idx_set = examine_mode(mode)
 
-        if not self.cv_mode:
-            epoched_raw_dataset_set = self.vec_epoched_raw_dataset[idx_set]
-            epoched_cleaned_dataset_set = self.vec_epoched_cleaned_dataset[idx_set]
-            vec_idx_slice_set = self.vec_idx_slice[idx_set]
-
-            if self.eval_dataset is not None:
-                epoched_eval_dataset_set = self.vec_epoched_eval_dataset[idx_set]
-            else:
-                epoched_eval_dataset_set = None
-        else:
+        if self.cv_mode:
             epoched_raw_dataset_set = self.mat_epoched_raw_dataset[idx_fold][idx_set]
             epoched_cleaned_dataset_set = self.mat_epoched_cleaned_dataset[idx_fold][idx_set]
             vec_idx_slice_set = self.mat_idx_slice[idx_fold][idx_set]
 
             if self.eval_dataset is not None:
                 epoched_eval_dataset_set = self.mat_epoched_eval_dataset[idx_fold][idx_set]
+            else:
+                epoched_eval_dataset_set = None
+        else:
+            epoched_raw_dataset_set = self.vec_epoched_raw_dataset[idx_set]
+            epoched_cleaned_dataset_set = self.vec_epoched_cleaned_dataset[idx_set]
+            vec_idx_slice_set = self.vec_idx_slice[idx_set]
+
+            if self.eval_dataset is not None:
+                epoched_eval_dataset_set = self.vec_epoched_eval_dataset[idx_set]
             else:
                 epoched_eval_dataset_set = None
 

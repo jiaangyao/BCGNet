@@ -265,14 +265,7 @@ def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  
         cleaned dataset if not
     """
 
-    if mode == 'test':
-        idx_set = 2
-    elif mode == 'valid':
-        idx_set = 1
-    elif mode == 'train':
-        idx_set = 0
-    else:
-        raise NotImplementedError
+    idx_set = examine_mode(mode)
 
     epoched_raw_dataset_set = vec_epoched_raw_dataset[idx_set]
     epoched_cleaned_dataset_set = vec_epoched_cleaned_dataset[idx_set]
@@ -311,4 +304,20 @@ def compute_rms(idx_run, vec_epoched_raw_dataset, vec_epoched_cleaned_dataset,  
     return vec_rms_set
 
 
+def examine_mode(mode):
+    """
+    Returns a numerical index corresponding to a mode
 
+    :param str mode: the subset user wishes to examine
+    :return: the numerical index
+    """
+    if mode == 'test':
+        idx_set = 2
+    elif mode == 'valid':
+        idx_set = 1
+    elif mode == 'train':
+        idx_set = 0
+    else:
+        raise NotImplementedError
+
+    return idx_set
