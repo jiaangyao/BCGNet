@@ -16,7 +16,7 @@ version of TensorFlow. Please note GPU version of TensorFlow is only for compati
 For the Tensorflow version 2.3.0 we used for testing the package, NVIDIA driver version has to be at least 418.39 and 
 CUDA version has to be 10.1. Our build was tested using NVIDIA driver version 435.21 and CUDA 10.1.
 
-To install NVIDIA driver, download the desired version for the particular OS and GPU on your local unit under the 'Advanced Driver Search' [here.](https://www.nvidia.com/Download/index.aspx)<br> 
+To install NVIDIA driver, download the desired version for the particular OS and GPU on your local unit under the 'Advanced Driver Search' [here](https://www.nvidia.com/Download/index.aspx)<br> 
 
 To install CUDA, detailed instructions can be found [here](https://developer.nvidia.com/cuda-toolkit)<br>
 
@@ -24,7 +24,7 @@ Note: after installing, NVIDIA driver and CUDA version can be checked by typing 
 
 ### 2. CuDNN
 Once CUDA is successfully installed, the user can proceed to install CuDNN. Detailed instructions for installing CuDNN
-can be found [here.](https://docs.nvidia.com/deeplearning/sdk/pdf/cuDNN-Installation-Guide.pdf)<br>
+can be found [here](https://docs.nvidia.com/deeplearning/sdk/pdf/cuDNN-Installation-Guide.pdf)<br>
 
 Note: For Linux users, note that it's critical that `LD_LIBRARY_PATH`, which maps the CuDNN path, is added to 
 `.bashrc` and sourced.
