@@ -136,8 +136,9 @@ each model must be contained in a separate file with the name of the file same a
 # Reference
 If you use this code in your project, please cite:
 ```
-McIntosh, J. R., Yao, J., Hong, L., Faller, J., & Sajda, P. (2020). Ballistocardiogram artifact reduction 
-in simultaneous EEG-fMRI using deep learning. IEEE Transactions on Biomedical Engineering.
+McIntosh, J. R., Yao, J., Hong, L., Faller, J., & Sajda, P. (2020). Ballistocardiogram artifact 
+reduction in simultaneous EEG-fMRI using deep learning. IEEE Transactions on Biomedical 
+Engineering.
 ```
 Direct link: https://ieeexplore.ieee.org/document/9124646
 
