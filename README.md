@@ -2,7 +2,7 @@ BCGNet: Deep Learning Toolbox for BCG Artifact Reduction
 ========================================================
 [![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
 [![License](https://img.shields.io/pypi/l/fooof.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Preprint](https://img.shields.io/badge/preprint-10.1101/299859-informational.svg)](https://ieeexplore.ieee.org/document/9124646)
+[![doi](https://https://img.shields.io/badge/doi-10.1109%2FTBME.2020.3004548-blue)](https://ieeexplore.ieee.org/document/9124646)
 
 
 BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction.
