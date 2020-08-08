@@ -1,13 +1,20 @@
-# BCGNet: Deep Learning Toolbox for BCG Artifact Reduction
-Authors: Jiaang Yao, Yida Lin, James McIntosh
+BCGNet: Deep Learning Toolbox for BCG Artifact Reduction
+========================================================
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
+[![License](https://img.shields.io/pypi/l/fooof.svg)](https://opensource.org/licenses/Apache-2.0)
+[![Preprint](https://img.shields.io/badge/preprint-10.1101/299859-informational.svg)](https://ieeexplore.ieee.org/document/9124646)
 
-BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction. 
-The details about our model and methodology can be found in this [paper](https://ieeexplore.ieee.org/document/9124646):
 
-J. R. McIntosh, J. Yao, L. Hong, J. Faller and P. Sajda, "Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning," 
-IEEE Trans Biomed Eng.<br>
+BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction.
 
-# Installation Guides
+# Table of Contents
+
+- [Installation Guide](#installation-guide)
+- [Jupyter Demo](#jupyter-demo)
+- [Usage](#usage)
+- [Paper](#paper)
+
+# Installation Guide
 ## Additional Dependencies (Optional)
 Before setting up the Python environment, there might be several additional software dependencies that need to 
 be installed if the user wishes to use the GPU version of TensorFlow for training, which is must faster than the CPU
@@ -51,7 +58,7 @@ conda env create -f requirement.yml
 ```
     
 ### 2. Using pip
-Alternatively, the user can choose to install all the Python dependencies using `pip` via the following command s
+Alternatively, the user can choose to install all the Python dependencies using `pip` via the following commands
 ```
 cd $PATH_TO_OUR_PACKAGE
 
@@ -126,3 +133,7 @@ each model must be contained in a separate file with the name of the file same a
 
 `\utils` contains utility functions that are used for the entire project.
 
+# Paper
+
+J. R. McIntosh, J. Yao, L. Hong, J. Faller and P. Sajda, "Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning," IEEE Trans Biomed Eng.
+https://ieeexplore.ieee.org/document/9124646
