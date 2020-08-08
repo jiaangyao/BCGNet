@@ -12,7 +12,7 @@ BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocard
 - [Installation Guide](#installation-guide)
 - [Jupyter Demo](#jupyter-demo)
 - [Usage](#usage)
-- [Paper](#paper)
+- [Reference](#reference)
 
 # Installation Guide
 ## Additional Dependencies (Optional)
@@ -133,10 +133,11 @@ each model must be contained in a separate file with the name of the file same a
 
 `\utils` contains utility functions that are used for the entire project.
 
-# Paper
+# Reference
 If you use this code in your project, please cite:
 ```
-McIntosh, J. R., Yao, J., Hong, L., Faller, J., & Sajda, P. (2020). Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning. IEEE Transactions on Biomedical Engineering.
+McIntosh, J. R., Yao, J., Hong, L., Faller, J., & Sajda, P. (2020). Ballistocardiogram artifact reduction 
+in simultaneous EEG-fMRI using deep learning. IEEE Transactions on Biomedical Engineering.
 ```
 Direct link: https://ieeexplore.ieee.org/document/9124646
 
