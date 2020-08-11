@@ -1,13 +1,20 @@
-# BCGNet: Deep Learning Toolbox for BCG Artifact Reduction
-Authors: Jiaang Yao, Yida Lin, James McIntosh
+BCGNet: Deep Learning Toolbox for BCG Artifact Reduction
+========================================================
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](http://www.repostatus.org/badges/latest/active.svg)](http://www.repostatus.org/#active)
+[![License](https://img.shields.io/github/license/SASVDERDBGTYS/BCGNet)](https://opensource.org/licenses/MIT)
+[![doi](https://img.shields.io/badge/doi-10.1109%2FTBME.2020.3004548-blue)](https://ieeexplore.ieee.org/document/9124646)
 
-BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction. 
-The details about our model and methodology can be found in this [paper](https://ieeexplore.ieee.org/document/9124646):
 
-J. R. McIntosh, J. Yao, L. Hong, J. Faller and P. Sajda, "Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning," 
-IEEE Trans Biomed Eng.<br>
+BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocardiogram (BCG) artifact reduction. More detail about our model and methods can be found [here](https://ieeexplore.ieee.org/document/9124646).<br>
 
-# Installation Guides
+# Table of Contents
+
+- [Installation Guide](#installation-guide)
+- [Jupyter Demo](#jupyter-demo)
+- [Usage](#usage)
+- [Reference](#reference)
+
+# Installation Guide
 ## Additional Dependencies (Optional)
 Before setting up the Python environment, there might be several additional software dependencies that need to 
 be installed if the user wishes to use the GPU version of TensorFlow for training, which is must faster than the CPU
@@ -51,7 +58,7 @@ conda env create -f requirement.yml
 ```
     
 ### 2. Using pip
-Alternatively, the user can choose to install all the Python dependencies using `pip` via the following command s
+Alternatively, the user can choose to install all the Python dependencies using `pip` via the following commands
 ```
 cd $PATH_TO_OUR_PACKAGE
 
@@ -126,3 +133,22 @@ each model must be contained in a separate file with the name of the file same a
 
 `\utils` contains utility functions that are used for the entire project.
 
+# Reference
+If you use this code in your project, please cite:
+```
+McIntosh, J. R., Yao, J., Hong, L., Faller, J., & Sajda, P. (2020). Ballistocardiogram artifact 
+reduction in simultaneous EEG-fMRI using deep learning. IEEE Transactions on Biomedical 
+Engineering.
+```
+Direct link: https://ieeexplore.ieee.org/document/9124646
+
+Bibtex format:
+```
+@article{mcintosh2020ballistocardiogram,
+  title={Ballistocardiogram artifact reduction in simultaneous EEG-fMRI using deep learning},
+  author={McIntosh, James R and Yao, Jiaang and Hong, Linbi and Faller, Josef and Sajda, Paul},
+  journal={IEEE Transactions on Biomedical Engineering},
+  year={2020},
+  publisher={IEEE}
+}
+```
