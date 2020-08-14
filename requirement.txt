@@ -1,8 +1,8 @@
-pyyaml
-easydict
-matplotlib
-mne==0.20.7
 tensorflow==2.3.0
 tensorflow-gpu==2.3.0
+mne==0.20.7
 scipy==1.4.1
+matplotlib
 tabulate
+pyyaml
+easydict
