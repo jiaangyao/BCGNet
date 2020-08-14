@@ -6,13 +6,14 @@ def update_init(dest_dir):
     vec_f_file = []
 
     if os.name == 'nt':
-        import win32api, win32con
+        import win32api
+        import win32con
 
     for d_file in dest_dir.iterdir():
         f_file = d_file.stem
 
         if os.name == 'nt':
-            attribute = win32api.GetFileAttributes(f_file)
+            attribute = win32api.GetFileAttributes(str(d_file))
             is_hidden = attribute & (win32con.FILE_ATTRIBUTE_HIDDEN | win32con.FILE_ATTRIBUTE_SYSTEM)
         else:
             is_hidden = f_file.startswith('.')
