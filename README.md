@@ -9,10 +9,15 @@ BCGNet is a deep learning toolbox based on Keras and TensorFlow for ballistocard
 
 # Table of Contents
 
+- [Video Presentation](#video-presentation)
 - [Installation Guide](#installation-guide)
 - [Jupyter Demo](#jupyter-demo)
 - [Usage](#usage)
 - [Reference](#reference)
+
+# Video Presentation
+https://youtu.be/JhU6qs3LMs8
+
 
 # Installation Guide
 ## Additional Dependencies (Optional)
