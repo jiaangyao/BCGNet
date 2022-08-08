@@ -143,7 +143,7 @@ class RNNModel(NNModel):
                               unroll=False, use_bias=True, reset_after=True,
                               implementation=2))(x)
 
-        bcg_out = Dense(63, activation='linear')(x)
+        bcg_out = Dense(n_output, activation='linear')(x)
         model = Model(inputs=ecg_input, outputs=bcg_out)
 
         return model
