@@ -5,15 +5,18 @@ channels:
 dependencies:
   - python=3.8.1
   - jupyterlab
+  - cudatoolkit=10.1
+  - cudnn=7.6.5
   - pip
   - pip:
-      - tensorflow-gpu==2.3.0        # GPU
-      # - tensorflow==2.3.0          # CPU
+      - tensorflow-gpu==2.3.0
       - mne==0.20.7
       - scipy==1.4.1
       - matplotlib
       - tabulate
       - pyyaml
       - easydict
+      # protobuf/grpc pins for TF 2.3 compatibility
       - protobuf==3.20.3
       - grpcio==1.32.0
+
