@@ -1,7 +1,7 @@
 name: bcgnet_TF230
 channels:
-  - defaults
-  - conda-forge
+- defaults
+- conda-forge
 dependencies:
   - python=3.8.1
   - jupyterlab
@@ -19,4 +19,3 @@ dependencies:
       # protobuf/grpc pins for TF 2.3 compatibility
       - protobuf==3.20.3
       - grpcio==1.32.0
-
