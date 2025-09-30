@@ -7,17 +7,13 @@ dependencies:
   - jupyterlab
   - pip
   - pip:
-      # Choose ONE TensorFlow line:
-      - tensorflow-gpu==2.3.0        # GPU build
-      # - tensorflow==2.3.0          # CPU-only (use this instead of the GPU line above)
-
+      - tensorflow-gpu==2.3.0        # GPU
+      # - tensorflow==2.3.0          # CPU
       - mne==0.20.7
       - scipy==1.4.1
       - matplotlib
       - tabulate
       - pyyaml
       - easydict
-
-      # Fix for "Descriptors cannot be created directly" with TF 2.3
       - protobuf==3.20.3
       - grpcio==1.32.0
