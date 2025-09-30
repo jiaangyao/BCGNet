@@ -60,16 +60,6 @@ cd $PATH_TO_OUR_PACKAGE
 
 conda env create -f requirement.yml
 ```
-    
-### 2. Using pip
-Alternatively, the user can choose to install all the Python dependencies using `pip` via the following commands
-```
-cd $PATH_TO_OUR_PACKAGE
-
-pip install requirement.txt
-```
-
-The user then needs to install `jupyterlab` and the detailed instructions can be found [here](https://jupyterlab.readthedocs.io/en/stable/getting_started/installation.html).<br>
 
 Note: to check the TensorFlow version, execute
 ```
